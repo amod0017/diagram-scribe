@@ -1,5 +1,6 @@
-# Specs — internal planning docs, not for public repo
+# Internal planning docs — not for public repo
 docs/specs/
+docs/superpowers/
 
 # Python
 __pycache__/
@@ -10,6 +11,7 @@ build/
 .venv/
 venv/
 .env
+.pytest_cache/
 
 # IDE
 .vscode/
