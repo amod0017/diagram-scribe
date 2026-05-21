@@ -1,0 +1,16 @@
+# Specs — internal planning docs, not for public repo
+docs/specs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
