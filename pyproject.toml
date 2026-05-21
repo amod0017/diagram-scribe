@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "diagram-scribe"
+version = "0.1.0"
+description = "Turn natural language descriptions into diagrams"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+dependencies = [
+    "anthropic>=0.40.0",
+]
+
+[project.optional-dependencies]
+openrouter = ["openai>=1.0.0"]
+ollama = ["openai>=1.0.0"]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.12.0",
+]
+
+[project.scripts]
+diagram-scribe = "diagram_scribe.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/diagram_scribe"]
