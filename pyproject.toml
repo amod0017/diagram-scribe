@@ -27,3 +27,8 @@ diagram-scribe = "diagram_scribe.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/diagram_scribe"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires real API keys and network access",
+]
