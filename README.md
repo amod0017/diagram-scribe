@@ -48,14 +48,17 @@ ds.refine("add a password reset path after account lock")
 
 ## LLM Options
 
-DiagramScribe needs an LLM to interpret your description. By default it uses Claude (Anthropic API key required). No API key? Use a free model via [OpenRouter](https://openrouter.ai) or run one locally with [Ollama](https://ollama.com).
+DiagramScribe needs an LLM to interpret your description. By default it uses [OpenRouter](https://openrouter.ai) — free models available, no credit card required. Or run one locally with [Ollama](https://ollama.com) (no account needed).
 
 ```bash
-# Free via OpenRouter
-OPENROUTER_API_KEY=... diagram-scribe
+# Free via OpenRouter (default) — sign up at openrouter.ai, create a key
+OPENROUTER_API_KEY=sk-or-... diagram-scribe
 
 # Local via Ollama (no internet, no account)
 OLLAMA_MODEL=qwen2.5 diagram-scribe
+
+# Claude via Anthropic (paid) — pip install "diagram-scribe[claude]"
+ANTHROPIC_API_KEY=sk-ant-... diagram-scribe
 ```
 
 ---

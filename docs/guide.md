@@ -19,12 +19,10 @@ You need access to an AI model to use it. DiagramScribe supports three options �
 pip install diagram-scribe
 ```
 
-For OpenRouter or Ollama support, install the extras:
+OpenRouter and Ollama work out of the box. To use Claude (Anthropic), install the extra:
 
 ```bash
-pip install "diagram-scribe[openrouter]"   # OpenRouter (free + paid models)
-pip install "diagram-scribe[ollama]"        # Ollama (fully local)
-pip install "diagram-scribe[openrouter,ollama]"  # both
+pip install "diagram-scribe[claude]"
 ```
 
 ---
@@ -39,9 +37,11 @@ There are three ways to get access:
 
 | Option | Cost | Privacy | Setup effort |
 |--------|------|---------|--------------|
-| **OpenRouter** (recommended for beginners) | Free tier available, no credit card | Your descriptions are sent to a cloud server | 5 minutes — sign up and copy a key |
-| **Ollama** (recommended if privacy matters) | Free forever | Everything stays on your machine | 10 minutes — install an app and download a model |
-| **Claude** (best quality) | Paid, ~$0.01–0.05 per diagram | Your descriptions are sent to Anthropic | 5 minutes — sign up and copy a key |
+| **OpenRouter** ✅ default, start here | Free tier available, no credit card | Your descriptions are sent to a cloud server | 5 minutes — sign up and copy a key |
+| **Ollama** (privacy / offline) | Free forever | Everything stays on your machine | 10–15 minutes — needs 8 GB RAM and ~4 GB disk for the model download |
+| **Claude** (highest quality) | Paid, ~$0.01–0.05 per diagram | Your descriptions are sent to Anthropic | 5 minutes — sign up and copy a key |
+
+**Start with OpenRouter.** It's the default, takes 5 minutes, has free models, and works on any machine. Switch to Ollama later if you need everything to stay local, or Claude if you want the highest quality results.
 
 ---
 

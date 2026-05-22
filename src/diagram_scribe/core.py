@@ -18,8 +18,8 @@ class DiagramScribe:
 
     Args:
         llm: An LLM adapter that implements :class:`~diagram_scribe.protocols.LLMAdapter`.
-            Defaults to :class:`~diagram_scribe.adapters.llm.claude.ClaudeAdapter`
-            (requires ``ANTHROPIC_API_KEY``).
+            Defaults to :class:`~diagram_scribe.adapters.llm.openrouter.OpenRouterAdapter`
+            using ``OPENROUTER_API_KEY`` and ``OPENROUTER_MODEL`` from the environment.
         backend: A backend adapter that implements
             :class:`~diagram_scribe.protocols.BackendAdapter`.
             Defaults to :class:`~diagram_scribe.adapters.backend.excalidraw.ExcalidrawAdapter`.
@@ -44,8 +44,12 @@ class DiagramScribe:
 
     @staticmethod
     def _default_llm() -> LLMAdapter:
-        from .adapters.llm.claude import ClaudeAdapter
-        return ClaudeAdapter()
+        import os
+        from .adapters.llm.openrouter import OpenRouterAdapter
+        return OpenRouterAdapter(
+            api_key=os.environ.get("OPENROUTER_API_KEY", ""),
+            model=os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct:free"),
+        )
 
     @staticmethod
     def _default_backend() -> BackendAdapter:
