@@ -60,6 +60,12 @@ OLLAMA_MODEL=qwen2.5 diagram-scribe
 
 ---
 
+## Documentation
+
+Full setup instructions, all LLM options, library examples, architecture overview, and contributing guide: **[docs/guide.md](docs/guide.md)**
+
+---
+
 ## License
 
 MIT
