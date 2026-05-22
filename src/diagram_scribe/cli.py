@@ -36,8 +36,14 @@ def _build_llm():
 
     print(
         "Error: No LLM configured.\n"
-        "Set one of: ANTHROPIC_API_KEY, OPENROUTER_API_KEY, or OLLAMA_MODEL\n"
-        "Tip: create a .env file in the current directory — see .env.example"
+        "\n"
+        "Quickest option — OpenRouter (free, no credit card):\n"
+        "  1. Sign up at https://openrouter.ai\n"
+        "  2. Create an API key under your avatar → Keys\n"
+        "  3. Add to .env in this directory:  OPENROUTER_API_KEY=sk-or-...\n"
+        "\n"
+        "Other options: OLLAMA_MODEL=qwen2.5 (local), ANTHROPIC_API_KEY=sk-ant-... (paid)\n"
+        "See docs/guide.md for full setup instructions."
     )
     sys.exit(1)
 
