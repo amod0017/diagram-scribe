@@ -1,3 +1,19 @@
+"""Prompt construction and response parsing for LLM adapters.
+
+All LLM adapters share the same prompts and the same JSON schema. This
+module keeps that logic in one place so changing the prompt affects every
+adapter at once.
+
+The LLM is always asked to return a JSON object with this shape::
+
+    {
+      "nodes": [{"id": "...", "label": "...", "shape": "..."}],
+      "edges": [{"from_id": "...", "to_id": "...", "label": "..."}]
+    }
+
+``shape`` must be one of "box", "diamond", "circle", "cylinder".
+``label`` on edges is optional.
+"""
 from __future__ import annotations
 import dataclasses
 import json
@@ -27,10 +43,32 @@ Rules:
 
 
 def build_generate_messages(description: str) -> list[dict]:
+    """Build the messages list for a generate() call.
+
+    Args:
+        description: The user's natural language diagram description.
+
+    Returns:
+        A list of message dicts in the format expected by both the
+        Anthropic and OpenAI-compatible chat APIs.
+    """
     return [{"role": "user", "content": f"Create a diagram for: {description}"}]
 
 
 def build_refine_messages(feedback: str, current: DiagramIR) -> list[dict]:
+    """Build the messages list for a refine() call.
+
+    Includes the current diagram serialised as JSON so the LLM can
+    produce an updated version that incorporates the feedback.
+
+    Args:
+        feedback: Plain English instruction for what to change.
+        current: The diagram state to modify.
+
+    Returns:
+        A list of message dicts in the format expected by both the
+        Anthropic and OpenAI-compatible chat APIs.
+    """
     current_json = json.dumps(dataclasses.asdict(current), indent=2)
     return [
         {
@@ -45,6 +83,20 @@ def build_refine_messages(feedback: str, current: DiagramIR) -> list[dict]:
 
 
 def parse_ir_response(text: str) -> DiagramIR:
+    """Parse an LLM response into a DiagramIR.
+
+    Strips Markdown code fences if the model wrapped the JSON in them,
+    then parses the JSON and constructs ``Node`` and ``Edge`` objects.
+
+    Args:
+        text: Raw text from the LLM response.
+
+    Returns:
+        A ``DiagramIR`` built from the parsed JSON.
+
+    Raises:
+        ValueError: If the text is not valid JSON or missing required fields.
+    """
     text = re.sub(r"```(?:json)?\s*|\s*```", "", text).strip()
     data = json.loads(text)
     nodes = [

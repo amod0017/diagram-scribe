@@ -1,3 +1,13 @@
+"""Excalidraw backend adapter.
+
+Converts a ``DiagramIR`` to Excalidraw JSON and writes it to disk.
+On the first ``render()`` call the file is opened in the default browser.
+Subsequent calls update the same file in place — the user refreshes the
+browser tab to see changes.
+
+Excalidraw file format reference:
+https://github.com/excalidraw/excalidraw/blob/master/packages/excalidraw/data/json.ts
+"""
 from __future__ import annotations
 import json
 import os
@@ -16,7 +26,22 @@ _SHAPE_MAP = {
 
 
 def _layout(nodes: list[Node], edges: list[Edge]) -> dict[str, tuple[float, float]]:
-    # nodes with no incoming edges start at level 0
+    """Assign x/y positions to nodes using a simple topological-level layout.
+
+    Nodes with no incoming edges are placed in the top row (level 0).
+    Each subsequent level is 160px below the previous. Nodes at the same
+    level are spaced 220px apart horizontally.
+
+    This is intentionally simple — Excalidraw's own auto-layout is richer.
+    The goal here is a readable default, not a perfect layout.
+
+    Args:
+        nodes: All nodes in the diagram.
+        edges: All directed edges.
+
+    Returns:
+        Mapping of node id → (x, y) pixel coordinates.
+    """
     to_ids = {e.to_id for e in edges}
     starts = [n.id for n in nodes if n.id not in to_ids] or [nodes[0].id]
 
@@ -41,6 +66,19 @@ def _layout(nodes: list[Node], edges: list[Edge]) -> dict[str, tuple[float, floa
 
 
 def _to_excalidraw(ir: DiagramIR) -> dict:
+    """Convert a DiagramIR to an Excalidraw file dict.
+
+    The returned dict can be serialised directly to JSON and opened as an
+    ``.excalidraw`` file. Every required Excalidraw field is populated;
+    optional fields that Excalidraw fills in automatically are omitted or
+    set to safe defaults.
+
+    Args:
+        ir: The diagram to convert.
+
+    Returns:
+        A dict matching the Excalidraw file schema.
+    """
     positions = _layout(ir.nodes, ir.edges)
     elements = []
     ts = int(time.time() * 1000)
@@ -99,6 +137,24 @@ def _to_excalidraw(ir: DiagramIR) -> dict:
 
 
 class ExcalidrawAdapter:
+    """Backend adapter that renders diagrams as Excalidraw files.
+
+    Writes the diagram to ``~/.diagram-scribe/current.excalidraw`` by
+    default (or a custom path if provided). Opens the file in the
+    default browser on the first render. Subsequent renders update the
+    file in place; the user refreshes the browser tab to see changes.
+
+    Args:
+        output_path: Path to write the ``.excalidraw`` file. Defaults to
+            ``~/.diagram-scribe/current.excalidraw``.
+
+    Example::
+
+        from diagram_scribe.adapters.backend.excalidraw import ExcalidrawAdapter
+        adapter = ExcalidrawAdapter(output_path="/tmp/my-diagram.excalidraw")
+        adapter.render(ir)
+    """
+
     def __init__(self, output_path: str | None = None):
         self._output_path = output_path or _DEFAULT_PATH
         self._opened = False

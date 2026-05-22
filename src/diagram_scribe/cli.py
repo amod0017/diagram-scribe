@@ -1,3 +1,18 @@
+"""Command-line interface for DiagramScribe.
+
+Runs an interactive session: prompts for a description, calls ``draw()``,
+then loops calling ``refine()`` until the user presses Enter on an empty line.
+
+LLM selection priority (first match wins):
+
+1. ``OPENROUTER_API_KEY`` set → :class:`~diagram_scribe.adapters.llm.openrouter.OpenRouterAdapter`
+2. ``OLLAMA_MODEL`` set → :class:`~diagram_scribe.adapters.llm.ollama.OllamaAdapter`
+3. ``ANTHROPIC_API_KEY`` set → :class:`~diagram_scribe.adapters.llm.claude.ClaudeAdapter`
+4. None set → exits with an error message
+
+API keys can be set as environment variables or placed in a ``.env`` file
+in the current directory — the CLI loads it automatically via python-dotenv.
+"""
 from __future__ import annotations
 import os
 import sys
