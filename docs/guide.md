@@ -6,10 +6,10 @@ DiagramScribe is a Python library and CLI tool that turns plain English descript
 
 It works in two steps:
 
-1. An LLM reads your description and produces a simple node/edge representation (called `DiagramIR`).
-2. A backend adapter translates that representation into the target diagram format.
+1. An AI model (called an LLM) reads your description and figures out what nodes and connections to draw.
+2. DiagramScribe turns that into an Excalidraw file and opens it in your browser.
 
-Both the LLM and the backend are swappable. The library ships with three LLM options (Claude, OpenRouter, Ollama) and one backend (Excalidraw). You can plug in your own.
+You need access to an AI model to use it. DiagramScribe supports three options — Claude, OpenRouter (free), and Ollama (local, no internet) — explained in the Setup section below.
 
 ---
 
@@ -31,66 +31,162 @@ pip install "diagram-scribe[openrouter,ollama]"  # both
 
 ## Setup: Choosing an LLM
 
-DiagramScribe needs an LLM to interpret your description. Three options:
+### What is an LLM?
 
-### Option 1: Claude (recommended for quality)
+An LLM (Large Language Model) is a program that understands and generates text. DiagramScribe uses one to read your diagram description and figure out what nodes and connections to draw. You don't need to know how it works — you just need access to one.
 
-Requires an [Anthropic API key](https://console.anthropic.com/).
+There are three ways to get access:
 
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-```
+| Option | Cost | Privacy | Setup effort |
+|--------|------|---------|--------------|
+| **OpenRouter** (recommended for beginners) | Free tier available, no credit card | Your descriptions are sent to a cloud server | 5 minutes — sign up and copy a key |
+| **Ollama** (recommended if privacy matters) | Free forever | Everything stays on your machine | 10 minutes — install an app and download a model |
+| **Claude** (best quality) | Paid, ~$0.01–0.05 per diagram | Your descriptions are sent to Anthropic | 5 minutes — sign up and copy a key |
 
-Or add it to a `.env` file in your working directory (the CLI loads this automatically):
+---
 
-```
-ANTHROPIC_API_KEY=sk-ant-...
-```
+### Option A: OpenRouter — free, no credit card required
 
-### Option 2: OpenRouter (free tier available)
+OpenRouter is a website that gives you access to many AI models through a single account. Several models are completely free.
 
-[OpenRouter](https://openrouter.ai) provides access to hundreds of models under one API key. Free models are available with no credit card required.
+**Step 1 — Create an account**
+
+Go to [openrouter.ai](https://openrouter.ai) and sign up. No credit card needed for free models.
+
+**Step 2 — Create an API key**
+
+1. Click your avatar (top right) → **Keys**
+2. Click **Create key**, give it any name, click **Create**
+3. Copy the key — it starts with `sk-or-v1-...`
+
+**Step 3 — Install the extra dependency**
 
 ```bash
 pip install "diagram-scribe[openrouter]"
-export OPENROUTER_API_KEY=sk-or-...
-export OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct:free  # free model
 ```
 
-Paid model example:
+**Step 4 — Set your key**
 
-```bash
-export OPENROUTER_MODEL=anthropic/claude-sonnet-4-6
+Create a file called `.env` in the folder where you run `diagram-scribe`:
+
+```
+OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-Browse available models at [openrouter.ai/models](https://openrouter.ai/models). Free models have `:free` suffix.
+That's it. DiagramScribe picks this up automatically when you run it.
 
-### Option 3: Ollama (fully local, no account needed)
+**Recommended free models**
 
-[Ollama](https://ollama.com) runs models on your machine. No internet required after the initial model download.
+All of these are free on OpenRouter (`:free` suffix = no cost). Copy the model name exactly into your `.env`:
+
+| Model | Set `OPENROUTER_MODEL=` | Notes |
+|-------|------------------------|-------|
+| Llama 3.1 8B by Meta | `meta-llama/llama-3.1-8b-instruct:free` | Default — good balance of quality and speed |
+| Qwen 2.5 7B by Alibaba | `qwen/qwen-2.5-7b-instruct:free` | Excellent at following structured instructions |
+| Gemma 2 9B by Google | `google/gemma-2-9b-it:free` | Higher quality, slightly slower |
+| Mistral 7B | `mistralai/mistral-7b-instruct:free` | Fast and lightweight |
+
+To use a specific model, add a second line to your `.env`:
+
+```
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_MODEL=qwen/qwen-2.5-7b-instruct:free
+```
+
+If you don't set `OPENROUTER_MODEL`, DiagramScribe uses Llama 3.1 8B by default.
+
+You can browse all free models at [openrouter.ai/models](https://openrouter.ai/models) — filter by "Free" in the top right.
+
+---
+
+### Option B: Ollama — fully local, nothing leaves your machine
+
+Ollama runs AI models on your own computer. After a one-time model download, it works completely offline. Good choice if you don't want your descriptions sent to any server.
+
+**Requirements:** At least 8 GB of RAM. More RAM lets you run larger (better) models.
+
+**Step 1 — Install Ollama**
+
+Download and run the installer from [ollama.com](https://ollama.com). It works on Mac, Windows, and Linux.
+
+After installing, Ollama runs in the background automatically. You'll see its icon in your system tray or menu bar.
+
+**Step 2 — Download a model**
+
+Open a terminal and run:
 
 ```bash
-# install Ollama, then pull a model
 ollama pull qwen2.5
-
-pip install "diagram-scribe[ollama]"
-export OLLAMA_MODEL=qwen2.5
 ```
 
-Qwen2.5 is recommended — it produces reliable structured JSON output.
+This downloads the model (about 4 GB). You only do this once.
 
-### .env file (CLI only)
-
-The CLI loads a `.env` file from the current directory at startup. Copy `.env.example` to `.env` and fill in your keys:
+**Step 3 — Install the extra dependency**
 
 ```bash
-cp .env.example .env
+pip install "diagram-scribe[ollama]"
 ```
 
+**Step 4 — Tell DiagramScribe which model to use**
+
+Create a `.env` file in the folder where you run `diagram-scribe`:
+
 ```
-# .env
+OLLAMA_MODEL=qwen2.5
+```
+
+No API key needed.
+
+**Recommended local models**
+
+| Model | Pull command | RAM needed | Notes |
+|-------|-------------|------------|-------|
+| Qwen 2.5 | `ollama pull qwen2.5` | 5 GB | Best choice — reliable structured output |
+| Llama 3.2 | `ollama pull llama3.2` | 5 GB | Good general quality |
+| Phi 3.5 Mini | `ollama pull phi3.5` | 3 GB | Smallest option — great if RAM is tight |
+| Gemma 2 | `ollama pull gemma2` | 6 GB | Slightly higher quality |
+
+To see what you've already downloaded: `ollama list`
+
+---
+
+### Option C: Claude — best quality
+
+Requires a paid [Anthropic account](https://console.anthropic.com/). Typical cost is a few cents per diagram.
+
+**Step 1 — Get an API key**
+
+1. Sign up at [console.anthropic.com](https://console.anthropic.com)
+2. Go to **API Keys** → **Create Key**
+3. Copy the key — it starts with `sk-ant-...`
+
+**Step 2 — Set your key**
+
+Create a `.env` file in the folder where you run `diagram-scribe`:
+
+```
 ANTHROPIC_API_KEY=sk-ant-...
 ```
+
+---
+
+### .env file reference
+
+The `.env` file goes in whichever folder you run `diagram-scribe` from. Create it with any text editor. Only set the lines for the option you chose:
+
+```bash
+# Option A — OpenRouter
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct:free   # optional, this is the default
+
+# Option B — Ollama (no key needed)
+OLLAMA_MODEL=qwen2.5
+
+# Option C — Claude
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+If you set multiple keys, DiagramScribe uses them in this priority order: OpenRouter → Ollama → Claude.
 
 ---
 
