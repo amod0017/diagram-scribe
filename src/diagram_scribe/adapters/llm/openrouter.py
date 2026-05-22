@@ -5,6 +5,28 @@ from ...prompts import SYSTEM_PROMPT, build_generate_messages, build_refine_mess
 
 
 class OpenRouterAdapter:
+    """LLM adapter that calls models via OpenRouter.
+
+    OpenRouter provides access to hundreds of models — free and paid —
+    under a single API key at https://openrouter.ai. The adapter uses the
+    OpenAI-compatible chat completions endpoint.
+
+    Free models have a ``:free`` suffix, e.g.
+    ``meta-llama/llama-3.1-8b-instruct:free``. Browse models at
+    https://openrouter.ai/models.
+
+    Args:
+        api_key: OpenRouter API key. Get one at https://openrouter.ai.
+        model: Model ID to use. Defaults to
+            ``"meta-llama/llama-3.1-8b-instruct:free"`` (free, no billing required).
+
+    Example::
+
+        from diagram_scribe.adapters.llm.openrouter import OpenRouterAdapter
+        adapter = OpenRouterAdapter(api_key="sk-or-...", model="anthropic/claude-sonnet-4-6")
+        ir = adapter.generate("CI/CD pipeline")
+    """
+
     def __init__(
         self,
         api_key: str,

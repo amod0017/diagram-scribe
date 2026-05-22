@@ -5,6 +5,24 @@ from ...prompts import SYSTEM_PROMPT, build_generate_messages, build_refine_mess
 
 
 class ClaudeAdapter:
+    """LLM adapter that calls the Anthropic API directly.
+
+    This is the default adapter when ``ANTHROPIC_API_KEY`` is set. It uses
+    ``claude-haiku-4-5-20251001`` by default — fast and cheap for structured
+    JSON generation tasks.
+
+    Args:
+        api_key: Anthropic API key. Reads ``ANTHROPIC_API_KEY`` from the
+            environment if not provided.
+        model: Anthropic model ID to use.
+
+    Example::
+
+        from diagram_scribe.adapters.llm.claude import ClaudeAdapter
+        adapter = ClaudeAdapter()  # reads ANTHROPIC_API_KEY from env
+        ir = adapter.generate("login flow")
+    """
+
     def __init__(
         self,
         api_key: str | None = None,
