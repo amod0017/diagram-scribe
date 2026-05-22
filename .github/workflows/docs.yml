@@ -28,10 +28,59 @@ jobs:
           python-version: "3.11"
 
       - name: Install package and pdoc
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev]" markdown
 
       - name: Generate API docs
         run: pdoc src/diagram_scribe -o _site
+
+      - name: Add User Guide to site
+        run: |
+          python - <<'EOF'
+          import markdown, re
+          from pathlib import Path
+
+          md_text = Path("docs/guide.md").read_text(encoding="utf-8")
+          body = markdown.markdown(md_text, extensions=["fenced_code", "tables", "toc"])
+
+          ref_files = sorted(Path("_site").rglob("*.html"))
+          style = ""
+          if ref_files:
+              ref_html = ref_files[0].read_text(encoding="utf-8")
+              m = re.search(r"(<style[^>]*>.*?</style>)", ref_html, re.DOTALL)
+              if m:
+                  style = m.group(1)
+
+          guide_page = """<!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <title>User Guide - DiagramScribe</title>
+            """ + style + """
+          </head>
+          <body>
+            <nav id="sidebar">
+              <h1>DiagramScribe</h1>
+              <p><a href="diagram_scribe.html">API Reference</a></p>
+            </nav>
+            <main id="content">
+              <article id="content">
+                """ + body + """
+              </article>
+            </main>
+          </body>
+          </html>"""
+          Path("_site/guide.html").write_text(guide_page, encoding="utf-8")
+
+          nav_link = '\n<p><a href="guide.html">User Guide</a></p>'
+          for f in sorted(Path("_site").rglob("*.html")):
+              if f.name == "guide.html":
+                  continue
+              text = f.read_text(encoding="utf-8")
+              new_text, n = re.subn(r'(<nav id="sidebar">)', r'\1' + nav_link, text, count=1)
+              if n:
+                  f.write_text(new_text, encoding="utf-8")
+          EOF
 
       - uses: actions/configure-pages@v4
 
