@@ -62,7 +62,8 @@ OLLAMA_MODEL=qwen2.5 diagram-scribe
 
 ## Documentation
 
-Full setup instructions, all LLM options, library examples, architecture overview, and contributing guide: **[docs/guide.md](docs/guide.md)**
+- **[User Guide](docs/guide.md)** — setup, all LLM options, CLI and library examples, architecture
+- **[API Reference](https://amod0017.github.io/diagram-scribe/)** — full class and method docs generated from source
 
 ---
 
