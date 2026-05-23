@@ -65,6 +65,30 @@ def _layout(nodes: list[Node], edges: list[Edge]) -> dict[str, tuple[float, floa
     return positions
 
 
+_NODE_H = 60
+_CHAR_W = 9  # approximate px per character at fontSize 14
+_NODE_PADDING = 40
+
+
+def _node_width(label: str) -> float:
+    return max(180.0, len(label) * _CHAR_W + _NODE_PADDING)
+
+
+def _base_element(eid: str, ts: int, **overrides) -> dict:
+    base = {
+        "id": eid, "angle": 0,
+        "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
+        "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid",
+        "roughness": 1, "opacity": 100,
+        "groupIds": [], "frameId": None, "roundness": None,
+        "seed": abs(hash(eid)) % 100000,
+        "version": 1, "versionNonce": 0, "isDeleted": False,
+        "boundElements": None, "updated": ts, "link": None, "locked": False,
+    }
+    base.update(overrides)
+    return base
+
+
 def _to_excalidraw(ir: DiagramIR) -> dict:
     """Convert a DiagramIR to an Excalidraw file dict.
 
@@ -80,58 +104,83 @@ def _to_excalidraw(ir: DiagramIR) -> dict:
         A dict matching the Excalidraw file schema.
     """
     positions = _layout(ir.nodes, ir.edges)
+    widths = {n.id: _node_width(n.label) for n in ir.nodes}
     elements = []
     ts = int(time.time() * 1000)
 
     for node in ir.nodes:
         x, y = positions.get(node.id, (0.0, 0.0))
-        elements.append({
-            "id": node.id,
-            "type": _SHAPE_MAP.get(node.shape, "rectangle"),
-            "x": x, "y": y, "width": 180, "height": 60,
-            "angle": 0,
-            "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
-            "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid",
-            "roughness": 1, "opacity": 100,
-            "groupIds": [], "frameId": None,
-            "roundness": {"type": 3} if node.shape == "box" else None,
-            "seed": abs(hash(node.id)) % 100000,
-            "version": 1, "versionNonce": 0, "isDeleted": False,
-            "boundElements": [], "updated": ts, "link": None, "locked": False,
-            "label": {
-                "text": node.label, "fontSize": 14, "fontFamily": 1,
-                "textAlign": "center", "verticalAlign": "middle",
-            },
-        })
+        w = widths[node.id]
+        text_id = f"{node.id}_text"
+        elements.append(_base_element(node.id, ts,
+            type=_SHAPE_MAP.get(node.shape, "rectangle"),
+            x=x, y=y, width=w, height=_NODE_H,
+            roundness={"type": 3} if node.shape == "box" else None,
+            boundElements=[{"type": "text", "id": text_id}],
+        ))
+        elements.append(_base_element(text_id, ts,
+            type="text",
+            x=x, y=y + (_NODE_H - 20) / 2,
+            width=w, height=20,
+            strokeWidth=1,
+            text=node.label,
+            fontSize=14, fontFamily=1,
+            textAlign="center", verticalAlign="middle",
+            containerId=node.id, baseline=14,
+        ))
 
     for i, edge in enumerate(ir.edges):
         edge_id = f"edge_{i}"
-        elements.append({
-            "id": edge_id,
-            "type": "arrow",
-            "x": 0, "y": 0, "width": 0, "height": 0,
-            "angle": 0,
-            "strokeColor": "#1e1e1e", "backgroundColor": "transparent",
-            "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid",
-            "roughness": 1, "opacity": 100,
-            "groupIds": [], "frameId": None, "roundness": {"type": 2},
-            "seed": abs(hash(edge_id)) % 100000,
-            "version": 1, "versionNonce": 0, "isDeleted": False,
-            "boundElements": None, "updated": ts, "link": None, "locked": False,
-            "startBinding": {"elementId": edge.from_id, "focus": 0.0, "gap": 8},
-            "endBinding": {"elementId": edge.to_id, "focus": 0.0, "gap": 8},
-            "lastCommittedPoint": None,
-            "startArrowhead": None, "endArrowhead": "arrow",
-            "points": [[0, 0], [0, 100]],
-            "label": {"text": edge.label} if edge.label else None,
-        })
+        sx, sy = positions.get(edge.from_id, (0.0, 0.0))
+        ex, ey = positions.get(edge.to_id, (0.0, 0.0))
+        sw, ew = widths.get(edge.from_id, 180.0), widths.get(edge.to_id, 180.0)
+        # bottom-center of source → top-center of destination
+        start_x = sx + sw / 2
+        start_y = sy + _NODE_H
+        dx = (ex + ew / 2) - start_x
+        dy = ey - start_y
+        elements.append(_base_element(edge_id, ts,
+            type="arrow",
+            x=start_x, y=start_y,
+            width=abs(dx), height=abs(dy),
+            roundness={"type": 2},
+            startBinding={"elementId": edge.from_id, "focus": 0.0, "gap": 8},
+            endBinding={"elementId": edge.to_id, "focus": 0.0, "gap": 8},
+            lastCommittedPoint=None,
+            startArrowhead=None, endArrowhead="arrow",
+            points=[[0, 0], [dx, dy]],
+        ))
+        if edge.label:
+            lbl_id = f"edge_{i}_label"
+            elements.append(_base_element(lbl_id, ts,
+                type="text",
+                x=start_x + dx / 2 - 40, y=start_y + dy / 2 - 10,
+                width=80, height=20,
+                strokeWidth=1,
+                text=edge.label,
+                fontSize=12, fontFamily=1,
+                textAlign="center", verticalAlign="middle",
+                containerId=None, baseline=12,
+            ))
+
+    # Center viewport on the diagram content
+    all_x = [p[0] for p in positions.values()]
+    all_y = [p[1] for p in positions.values()]
+    cx = (min(all_x) + max(all_x) + _NODE_W) / 2 if all_x else 0
+    cy = (min(all_y) + max(all_y) + _NODE_H) / 2 if all_y else 0
 
     return {
         "type": "excalidraw",
         "version": 2,
         "source": "https://excalidraw.com",
         "elements": elements,
-        "appState": {"gridSize": None, "viewBackgroundColor": "#ffffff"},
+        "appState": {
+            "gridSize": None,
+            "viewBackgroundColor": "#ffffff",
+            "scrollX": -cx + 400,
+            "scrollY": -cy + 300,
+            "zoom": {"value": 1.0},
+        },
         "files": {},
     }
 
