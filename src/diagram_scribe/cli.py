@@ -17,6 +17,7 @@ Two locations are checked in order:
 2. ``.env`` in the current directory — per-project override
 """
 from __future__ import annotations
+import argparse
 import os
 import sys
 from dotenv import load_dotenv
@@ -139,9 +140,26 @@ def _build_llm():
     return None
 
 
-def main():
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="diagram-scribe",
+        description="Turn natural language descriptions into Excalidraw diagrams.",
+    )
+    parser.add_argument("--key", metavar="API_KEY", help="OpenRouter API key (overrides .env)")
+    parser.add_argument("--model", metavar="MODEL", help="OpenRouter model to use (overrides .env)")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None):
+    args = _parse_args(argv)
+
     load_dotenv(_CONFIG_ENV)  # persistent user config (~/.config/diagram-scribe/.env)
     load_dotenv()              # per-project override (.env in CWD)
+
+    if args.key:
+        os.environ["OPENROUTER_API_KEY"] = args.key
+    if args.model:
+        os.environ["OPENROUTER_MODEL"] = args.model
 
     llm = _build_llm()
     if llm is None:

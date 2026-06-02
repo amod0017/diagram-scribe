@@ -8,7 +8,7 @@ def test_main_loads_dotenv_before_building_llm():
          patch("diagram_scribe.cli._build_llm", return_value=MagicMock()), \
          patch("diagram_scribe.cli.DiagramScribe", return_value=MagicMock()), \
          patch("builtins.input", side_effect=[""]):
-        main()
+        main([])
         mock_load.assert_called()
 
 
@@ -17,7 +17,7 @@ def test_main_loads_config_env_first():
          patch("diagram_scribe.cli._build_llm", return_value=MagicMock()), \
          patch("diagram_scribe.cli.DiagramScribe", return_value=MagicMock()), \
          patch("builtins.input", side_effect=[""]):
-        main()
+        main([])
         first_call_arg = mock_load.call_args_list[0][0][0]
         assert first_call_arg == _CONFIG_ENV
 
@@ -27,7 +27,7 @@ def test_main_loads_cwd_dotenv_second():
          patch("diagram_scribe.cli._build_llm", return_value=MagicMock()), \
          patch("diagram_scribe.cli.DiagramScribe", return_value=MagicMock()), \
          patch("builtins.input", side_effect=[""]):
-        main()
+        main([])
         assert mock_load.call_count == 2
         # second call is load_dotenv() with no args (CWD .env)
         second_call_args = mock_load.call_args_list[1][0]
