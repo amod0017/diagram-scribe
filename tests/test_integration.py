@@ -51,7 +51,7 @@ def test_openrouter_generates_valid_excalidraw(tmp_path):
     ds = DiagramScribe(
         llm=OpenRouterAdapter(
             api_key=os.environ["OPENROUTER_API_KEY"],
-            model=os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct:free"),
+            model=os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-super-120b-a12b:free"),
         ),
         backend=ExcalidrawAdapter(output_path=str(output)),
     )
