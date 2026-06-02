@@ -48,7 +48,7 @@ class DiagramScribe:
         from .adapters.llm.openrouter import OpenRouterAdapter
         return OpenRouterAdapter(
             api_key=os.environ.get("OPENROUTER_API_KEY", ""),
-            model=os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct:free"),
+            model=os.environ.get("OPENROUTER_MODEL", "nvidia/nemotron-3-super-120b-a12b:free"),
         )
 
     @staticmethod

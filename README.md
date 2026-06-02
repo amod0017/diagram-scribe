@@ -61,6 +61,20 @@ OLLAMA_MODEL=qwen2.5 diagram-scribe
 ANTHROPIC_API_KEY=sk-ant-... diagram-scribe
 ```
 
+Or create `~/.config/diagram-scribe/.env` (works from any directory):
+
+```ini
+# OpenRouter (default)
+OPENROUTER_API_KEY=sk-or-...
+OPENROUTER_MODEL=nvidia/nemotron-3-super-120b-a12b:free
+
+# Ollama
+# OLLAMA_MODEL=qwen2.5
+
+# Anthropic
+# ANTHROPIC_API_KEY=sk-ant-...
+```
+
 ---
 
 ## Documentation
