@@ -166,7 +166,8 @@ def _to_excalidraw(ir: DiagramIR) -> dict:
     # Center viewport on the diagram content
     all_x = [p[0] for p in positions.values()]
     all_y = [p[1] for p in positions.values()]
-    cx = (min(all_x) + max(all_x) + _NODE_W) / 2 if all_x else 0
+    max_w = max((widths.get(n.id, 180.0) for n in ir.nodes), default=180.0)
+    cx = (min(all_x) + max(all_x) + max_w) / 2 if all_x else 0
     cy = (min(all_y) + max(all_y) + _NODE_H) / 2 if all_y else 0
 
     return {

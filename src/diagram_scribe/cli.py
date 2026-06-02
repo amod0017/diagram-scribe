@@ -10,14 +10,19 @@ LLM selection priority (first match wins):
 3. ``ANTHROPIC_API_KEY`` set → :class:`~diagram_scribe.adapters.llm.claude.ClaudeAdapter`
 4. None set → exits with an error message
 
-API keys can be set as environment variables or placed in a ``.env`` file
-in the current directory — the CLI loads it automatically via python-dotenv.
+API keys can be set as environment variables or in a ``.env`` file.
+Two locations are checked in order:
+
+1. ``~/.config/diagram-scribe/.env`` — persistent user config (works from any directory)
+2. ``.env`` in the current directory — per-project override
 """
 from __future__ import annotations
 import os
 import sys
 from dotenv import load_dotenv
 from .core import DiagramScribe
+
+_CONFIG_ENV = os.path.join(os.path.expanduser("~"), ".config", "diagram-scribe", ".env")
 
 
 def _build_llm():
@@ -49,7 +54,8 @@ def _build_llm():
 
 
 def main():
-    load_dotenv()
+    load_dotenv(_CONFIG_ENV)  # persistent user config (~/.config/diagram-scribe/.env)
+    load_dotenv()              # per-project override (.env in CWD)
     llm = _build_llm()
     ds = DiagramScribe(llm=llm)
 
