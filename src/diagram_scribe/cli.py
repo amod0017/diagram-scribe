@@ -8,7 +8,7 @@ LLM selection priority (first match wins):
 1. ``OPENROUTER_API_KEY`` set → :class:`~diagram_scribe.adapters.llm.openrouter.OpenRouterAdapter`
 2. ``OLLAMA_MODEL`` set → :class:`~diagram_scribe.adapters.llm.ollama.OllamaAdapter`
 3. ``ANTHROPIC_API_KEY`` set → :class:`~diagram_scribe.adapters.llm.claude.ClaudeAdapter`
-4. None set → exits with an error message
+4. None set → interactive first-run setup wizard
 
 API keys can be set as environment variables or in a ``.env`` file.
 Two locations are checked in order:
@@ -22,13 +22,110 @@ import sys
 from dotenv import load_dotenv
 from .core import DiagramScribe
 
-_CONFIG_ENV = os.path.join(os.path.expanduser("~"), ".config", "diagram-scribe", ".env")
+_CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", "diagram-scribe")
+_CONFIG_ENV = os.path.join(_CONFIG_DIR, ".env")
+
+_DEFAULT_FREE_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
+
+
+def _fetch_free_models(api_key: str) -> list[str]:
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
+        models = client.models.list()
+        free = sorted(
+            m.id for m in models.data
+            if m.id.endswith(":free")
+        )
+        return free if free else [_DEFAULT_FREE_MODEL]
+    except Exception:
+        return [_DEFAULT_FREE_MODEL]
+
+
+def _run_setup_wizard() -> None:
+    """Interactive first-run setup — writes ~/.config/diagram-scribe/.env."""
+    print("\nDiagramScribe needs an LLM. Let's get you set up.\n")
+    print("Options:")
+    print("  1. OpenRouter  (free models available, sign up at openrouter.ai)")
+    print("  2. Ollama      (fully local, no account needed)")
+    print("  3. Anthropic   (paid, pip install 'diagram-scribe[claude]')")
+    print()
+
+    while True:
+        choice = input("Choose [1/2/3]: ").strip()
+        if choice in ("1", "2", "3"):
+            break
+        print("Please enter 1, 2, or 3.")
+
+    lines: list[str] = []
+
+    if choice == "1":
+        key = input("\nPaste your OpenRouter API key (sk-or-...): ").strip()
+        if not key:
+            print("No key entered. Exiting.")
+            sys.exit(1)
+
+        print("\nFetching available free models...")
+        models = _fetch_free_models(key)
+
+        print(f"\n{len(models)} free models available. Top picks:\n")
+        display = models[:10]
+        for i, m in enumerate(display, 1):
+            print(f"  {i:2}. {m}")
+        if len(models) > 10:
+            print(f"  ... and {len(models) - 10} more")
+
+        print()
+        default_idx = next(
+            (i + 1 for i, m in enumerate(display) if m == _DEFAULT_FREE_MODEL),
+            1
+        )
+        while True:
+            raw = input(f"Pick a model [1-{len(display)}, default={default_idx}]: ").strip()
+            if raw == "":
+                selected = display[default_idx - 1]
+                break
+            if raw.isdigit() and 1 <= int(raw) <= len(display):
+                selected = display[int(raw) - 1]
+                break
+            print(f"Enter a number between 1 and {len(display)}.")
+
+        lines = [
+            f"OPENROUTER_API_KEY={key}",
+            f"OPENROUTER_MODEL={selected}",
+        ]
+        os.environ["OPENROUTER_API_KEY"] = key
+        os.environ["OPENROUTER_MODEL"] = selected
+        print(f"\nUsing model: {selected}")
+
+    elif choice == "2":
+        model = input("\nOllama model name (e.g. qwen2.5): ").strip()
+        if not model:
+            print("No model entered. Exiting.")
+            sys.exit(1)
+        lines = [f"OLLAMA_MODEL={model}"]
+        os.environ["OLLAMA_MODEL"] = model
+
+    elif choice == "3":
+        key = input("\nPaste your Anthropic API key (sk-ant-...): ").strip()
+        if not key:
+            print("No key entered. Exiting.")
+            sys.exit(1)
+        lines = [f"ANTHROPIC_API_KEY={key}"]
+        os.environ["ANTHROPIC_API_KEY"] = key
+
+    os.makedirs(_CONFIG_DIR, exist_ok=True)
+    with open(_CONFIG_ENV, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+    print(f"\nConfig saved to {_CONFIG_ENV}")
+    print("You won't need to set this up again.\n")
 
 
 def _build_llm():
     if os.getenv("OPENROUTER_API_KEY"):
         from .adapters.llm.openrouter import OpenRouterAdapter
-        model = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
+        model = os.getenv("OPENROUTER_MODEL", _DEFAULT_FREE_MODEL)
         return OpenRouterAdapter(api_key=os.environ["OPENROUTER_API_KEY"], model=model)
 
     if os.getenv("OLLAMA_MODEL"):
@@ -39,24 +136,21 @@ def _build_llm():
         from .adapters.llm.claude import ClaudeAdapter
         return ClaudeAdapter()
 
-    print(
-        "Error: No LLM configured.\n"
-        "\n"
-        "Quickest option — OpenRouter (free, no credit card):\n"
-        "  1. Sign up at https://openrouter.ai\n"
-        "  2. Create an API key under your avatar → Keys\n"
-        "  3. Add to .env in this directory:  OPENROUTER_API_KEY=sk-or-...\n"
-        "\n"
-        "Other options: OLLAMA_MODEL=qwen2.5 (local), ANTHROPIC_API_KEY=sk-ant-... (paid)\n"
-        "See docs/guide.md for full setup instructions."
-    )
-    sys.exit(1)
+    return None
 
 
 def main():
     load_dotenv(_CONFIG_ENV)  # persistent user config (~/.config/diagram-scribe/.env)
     load_dotenv()              # per-project override (.env in CWD)
+
     llm = _build_llm()
+    if llm is None:
+        _run_setup_wizard()
+        llm = _build_llm()
+        if llm is None:
+            print("Setup failed. Exiting.")
+            sys.exit(1)
+
     ds = DiagramScribe(llm=llm)
 
     print("DiagramScribe — describe your diagram in plain English.")
@@ -68,7 +162,7 @@ def main():
 
     print("Generating diagram...")
     ds.draw(description)
-    print("[diagram opened]\n")
+    print(f"[diagram saved to {ds._backend._output_path}]\n")
 
     while True:
         feedback = input("> Refine (or press Enter to finish): ").strip()

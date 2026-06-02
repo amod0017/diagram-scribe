@@ -15,7 +15,7 @@ import time
 import webbrowser
 from ...models import DiagramIR, Node, Edge
 
-_DEFAULT_PATH = os.path.join(os.path.expanduser("~"), ".diagram-scribe", "current.excalidraw")
+_DEFAULT_PATH = os.path.join(os.path.expanduser("~"), "Documents", "diagram-scribe.excalidraw")
 
 _SHAPE_MAP = {
     "box": "rectangle",
@@ -189,14 +189,14 @@ def _to_excalidraw(ir: DiagramIR) -> dict:
 class ExcalidrawAdapter:
     """Backend adapter that renders diagrams as Excalidraw files.
 
-    Writes the diagram to ``~/.diagram-scribe/current.excalidraw`` by
+    Writes the diagram to ``~/Documents/diagram-scribe.excalidraw`` by
     default (or a custom path if provided). Opens the file in the
     default browser on the first render. Subsequent renders update the
     file in place; the user refreshes the browser tab to see changes.
 
     Args:
         output_path: Path to write the ``.excalidraw`` file. Defaults to
-            ``~/.diagram-scribe/current.excalidraw``.
+            ``~/Documents/diagram-scribe.excalidraw``.
 
     Example::
 
