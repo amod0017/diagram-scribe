@@ -23,6 +23,7 @@ import sys
 from dotenv import load_dotenv
 from openai import OpenAI
 from .core import DiagramScribe
+from .adapters.backend.excalidraw import ExcalidrawAdapter
 
 _CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", "diagram-scribe")
 _CONFIG_ENV = os.path.join(_CONFIG_DIR, ".env")
@@ -147,19 +148,20 @@ def _run_setup_wizard() -> None:
     print("You won't need to set this up again.\n")
 
 
-def _build_llm():
+def _build_llm(model_override: str | None = None):
     if os.getenv("OPENROUTER_API_KEY"):
         from .adapters.llm.openrouter import OpenRouterAdapter
-        model = os.getenv("OPENROUTER_MODEL", _DEFAULT_FREE_MODEL)
+        model = model_override or os.getenv("OPENROUTER_MODEL", _DEFAULT_FREE_MODEL)
         return OpenRouterAdapter(api_key=os.environ["OPENROUTER_API_KEY"], model=model)
 
     if os.getenv("OLLAMA_MODEL"):
         from .adapters.llm.ollama import OllamaAdapter
-        return OllamaAdapter(model=os.environ["OLLAMA_MODEL"])
+        model = model_override or os.environ["OLLAMA_MODEL"]
+        return OllamaAdapter(model=model)
 
     if os.getenv("ANTHROPIC_API_KEY"):
         from .adapters.llm.claude import ClaudeAdapter
-        return ClaudeAdapter()
+        return ClaudeAdapter(model=model_override)
 
     return None
 
@@ -170,7 +172,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Turn natural language descriptions into Excalidraw diagrams.",
     )
     parser.add_argument("--key", metavar="API_KEY", help="OpenRouter API key (overrides .env)")
-    parser.add_argument("--model", metavar="MODEL", help="OpenRouter model to use (overrides .env)")
+    parser.add_argument("--model", metavar="MODEL", help="Model to use for the active provider (overrides .env)")
+    parser.add_argument("--output", metavar="PATH", help="Output .excalidraw file path (overrides DIAGRAM_SCRIBE_OUTPUT)")
     return parser.parse_args(argv)
 
 
@@ -182,18 +185,18 @@ def main(argv: list[str] | None = None):
 
     if args.key:
         os.environ["OPENROUTER_API_KEY"] = args.key
-    if args.model:
-        os.environ["OPENROUTER_MODEL"] = args.model
 
-    llm = _build_llm()
+    llm = _build_llm(model_override=args.model)
     if llm is None:
         _run_setup_wizard()
-        llm = _build_llm()
+        llm = _build_llm(model_override=args.model)
         if llm is None:
             print("Setup failed. Exiting.")
             sys.exit(1)
 
-    ds = DiagramScribe(llm=llm)
+    output_path = args.output or os.getenv("DIAGRAM_SCRIBE_OUTPUT")
+    backend = ExcalidrawAdapter(output_path=output_path)
+    ds = DiagramScribe(llm=llm, backend=backend)
 
     print("DiagramScribe — describe your diagram in plain English.")
     print("Press Enter on an empty line to quit.\n")
@@ -204,7 +207,7 @@ def main(argv: list[str] | None = None):
 
     print("Generating diagram...")
     ds.draw(description)
-    print(f"[diagram saved to {ds._backend._output_path}]\n")
+    print(f"[diagram saved to {backend._output_path}]\n")
 
     while True:
         feedback = input("> Refine (or press Enter to finish): ").strip()
