@@ -1,7 +1,7 @@
 import os
 import pytest
 from unittest.mock import patch, MagicMock, call
-from diagram_scribe.cli import main, _build_llm, _run_setup_wizard, _parse_args
+from diagram_scribe.cli import main, _build_llm, _run_setup_wizard, _parse_args, _fetch_ollama_models
 
 
 def test_build_llm_uses_openrouter_when_key_set():
@@ -104,10 +104,11 @@ def test_setup_wizard_ollama_writes_config(tmp_path):
     config_env = tmp_path / ".env"
     with patch("diagram_scribe.cli._CONFIG_DIR", str(tmp_path)), \
          patch("diagram_scribe.cli._CONFIG_ENV", str(config_env)), \
-         patch("builtins.input", side_effect=["2", "qwen2.5"]):
+         patch("diagram_scribe.cli._fetch_ollama_models", return_value=["qwen2.5:latest"]), \
+         patch("builtins.input", side_effect=["2", "1"]):
         _run_setup_wizard()
 
-    assert "OLLAMA_MODEL=qwen2.5" in config_env.read_text()
+    assert "OLLAMA_MODEL=qwen2.5:latest" in config_env.read_text()
 
 
 def test_setup_wizard_anthropic_writes_config(tmp_path):
@@ -189,3 +190,42 @@ def test_key_and_model_flags_together(monkeypatch):
         main(["--key", "sk-or-test", "--model", "nvidia/foo:free"])
     assert os.environ.get("OPENROUTER_API_KEY") == "sk-or-test"
     assert os.environ.get("OPENROUTER_MODEL") == "nvidia/foo:free"
+
+
+# --- Ollama model listing ---
+
+def test_setup_wizard_ollama_lists_models(tmp_path):
+    config_env = tmp_path / ".env"
+    with patch("diagram_scribe.cli._CONFIG_DIR", str(tmp_path)), \
+         patch("diagram_scribe.cli._CONFIG_ENV", str(config_env)), \
+         patch("diagram_scribe.cli._fetch_ollama_models", return_value=["qwen3.6:latest", "llama3:latest"]), \
+         patch("builtins.input", side_effect=["2", "1"]):
+        _run_setup_wizard()
+
+    assert "OLLAMA_MODEL=qwen3.6:latest" in config_env.read_text()
+
+
+def test_setup_wizard_ollama_falls_back_to_manual_when_no_models(tmp_path):
+    config_env = tmp_path / ".env"
+    with patch("diagram_scribe.cli._CONFIG_DIR", str(tmp_path)), \
+         patch("diagram_scribe.cli._CONFIG_ENV", str(config_env)), \
+         patch("diagram_scribe.cli._fetch_ollama_models", return_value=[]), \
+         patch("builtins.input", side_effect=["2", "qwen2.5"]):
+        _run_setup_wizard()
+
+    assert "OLLAMA_MODEL=qwen2.5" in config_env.read_text()
+
+
+def test_fetch_ollama_models_returns_list_on_success():
+    mock_model = type("M", (), {"id": "qwen3.6:latest"})()
+    mock_response = type("R", (), {"data": [mock_model]})()
+    with patch("diagram_scribe.cli.OpenAI") as mock_openai:
+        mock_openai.return_value.models.list.return_value = mock_response
+        models = _fetch_ollama_models()
+    assert models == ["qwen3.6:latest"]
+
+
+def test_fetch_ollama_models_returns_empty_on_failure():
+    with patch("diagram_scribe.cli.OpenAI", side_effect=Exception("connection refused")):
+        models = _fetch_ollama_models()
+    assert models == []

@@ -56,3 +56,22 @@ def test_parse_ir_response_edge_without_label():
     )
     ir = parse_ir_response(text)
     assert ir.edges[0].label is None
+
+
+def test_parse_ir_response_strips_think_tags():
+    text = (
+        "<think>Let me think about this diagram...</think>\n"
+        '{"nodes": [{"id": "a", "label": "Start", "shape": "circle"}], "edges": []}'
+    )
+    ir = parse_ir_response(text)
+    assert len(ir.nodes) == 1
+    assert ir.nodes[0].id == "a"
+
+
+def test_parse_ir_response_strips_multiline_think_tags():
+    text = (
+        "<think>\nReasoning over multiple lines...\nDone.\n</think>\n"
+        '```json\n{"nodes": [{"id": "b", "label": "End", "shape": "circle"}], "edges": []}\n```'
+    )
+    ir = parse_ir_response(text)
+    assert ir.nodes[0].id == "b"

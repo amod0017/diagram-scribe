@@ -21,6 +21,7 @@ import argparse
 import os
 import sys
 from dotenv import load_dotenv
+from openai import OpenAI
 from .core import DiagramScribe
 
 _CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", "diagram-scribe")
@@ -31,7 +32,6 @@ _DEFAULT_FREE_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
 
 def _fetch_free_models(api_key: str) -> list[str]:
     try:
-        from openai import OpenAI
         client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
         models = client.models.list()
         free = sorted(
@@ -41,6 +41,15 @@ def _fetch_free_models(api_key: str) -> list[str]:
         return free if free else [_DEFAULT_FREE_MODEL]
     except Exception:
         return [_DEFAULT_FREE_MODEL]
+
+
+def _fetch_ollama_models() -> list[str]:
+    try:
+        client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+        models = client.models.list()
+        return sorted(m.id for m in models.data)
+    except Exception:
+        return []
 
 
 def _run_setup_wizard() -> None:
@@ -100,7 +109,22 @@ def _run_setup_wizard() -> None:
         print(f"\nUsing model: {selected}")
 
     elif choice == "2":
-        model = input("\nOllama model name (e.g. qwen2.5): ").strip()
+        print("\nFetching available Ollama models...")
+        ollama_models = _fetch_ollama_models()
+        if ollama_models:
+            print(f"\n{len(ollama_models)} model(s) found:\n")
+            for i, m in enumerate(ollama_models, 1):
+                print(f"  {i:2}. {m}")
+            print()
+            while True:
+                raw = input(f"Pick a model [1-{len(ollama_models)}]: ").strip()
+                if raw.isdigit() and 1 <= int(raw) <= len(ollama_models):
+                    model = ollama_models[int(raw) - 1]
+                    break
+                print(f"Enter a number between 1 and {len(ollama_models)}.")
+        else:
+            print("Could not connect to Ollama. Is it running? (ollama serve)")
+            model = input("\nOllama model name (e.g. qwen2.5): ").strip()
         if not model:
             print("No model entered. Exiting.")
             sys.exit(1)
