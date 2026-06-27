@@ -97,6 +97,7 @@ def parse_ir_response(text: str) -> DiagramIR:
     Raises:
         ValueError: If the text is not valid JSON or missing required fields.
     """
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
     text = re.sub(r"```(?:json)?\s*|\s*```", "", text).strip()
     data = json.loads(text)
     nodes = [
