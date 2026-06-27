@@ -138,6 +138,7 @@ def test_parse_args_defaults_are_none():
     args = _parse_args([])
     assert args.key is None
     assert args.model is None
+    assert args.output is None
 
 
 def test_parse_args_key_flag():
@@ -150,46 +151,109 @@ def test_parse_args_model_flag():
     assert args.model == "google/gemma-4-31b-it:free"
 
 
-def test_parse_args_both_flags():
-    args = _parse_args(["--key", "sk-or-test", "--model", "nvidia/foo:free"])
+def test_parse_args_output_flag():
+    args = _parse_args(["--output", "/tmp/my.excalidraw"])
+    assert args.output == "/tmp/my.excalidraw"
+
+
+def test_parse_args_all_flags():
+    args = _parse_args(["--key", "sk-or-test", "--model", "nvidia/foo:free", "--output", "/tmp/x.excalidraw"])
     assert args.key == "sk-or-test"
     assert args.model == "nvidia/foo:free"
+    assert args.output == "/tmp/x.excalidraw"
 
 
-def test_key_flag_overrides_env(monkeypatch):
+def test_key_flag_sets_openrouter_key(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    mock_ds = MagicMock()
     with patch("diagram_scribe.cli.load_dotenv"), \
-         patch("diagram_scribe.cli.DiagramScribe", return_value=mock_ds), \
+         patch("diagram_scribe.cli.ExcalidrawAdapter"), \
+         patch("diagram_scribe.cli.DiagramScribe"), \
          patch("diagram_scribe.adapters.llm.openrouter.OpenAI"), \
          patch("builtins.input", side_effect=[""]):
         main(["--key", "sk-or-fromflag"])
     assert os.environ.get("OPENROUTER_API_KEY") == "sk-or-fromflag"
 
 
-def test_model_flag_overrides_env(monkeypatch):
+def test_model_flag_used_for_openrouter(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-existing")
     monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
-    mock_ds = MagicMock()
+    captured = {}
+    def fake_adapter(api_key, model):
+        captured["model"] = model
+        return MagicMock()
     with patch("diagram_scribe.cli.load_dotenv"), \
-         patch("diagram_scribe.cli.DiagramScribe", return_value=mock_ds), \
-         patch("diagram_scribe.adapters.llm.openrouter.OpenAI"), \
+         patch("diagram_scribe.cli.ExcalidrawAdapter"), \
+         patch("diagram_scribe.cli.DiagramScribe"), \
+         patch("diagram_scribe.adapters.llm.openrouter.OpenRouterAdapter", side_effect=fake_adapter), \
          patch("builtins.input", side_effect=[""]):
         main(["--model", "google/gemma-4-31b-it:free"])
-    assert os.environ.get("OPENROUTER_MODEL") == "google/gemma-4-31b-it:free"
+    assert captured["model"] == "google/gemma-4-31b-it:free"
 
 
-def test_key_and_model_flags_together(monkeypatch):
+def test_model_flag_used_for_ollama(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
-    mock_ds = MagicMock()
+    monkeypatch.setenv("OLLAMA_MODEL", "qwen3.6:latest")
+    captured = {}
+    def fake_adapter(model):
+        captured["model"] = model
+        return MagicMock()
     with patch("diagram_scribe.cli.load_dotenv"), \
-         patch("diagram_scribe.cli.DiagramScribe", return_value=mock_ds), \
+         patch("diagram_scribe.cli.ExcalidrawAdapter"), \
+         patch("diagram_scribe.cli.DiagramScribe"), \
+         patch("diagram_scribe.adapters.llm.ollama.OllamaAdapter", side_effect=fake_adapter), \
+         patch("builtins.input", side_effect=[""]):
+        main(["--model", "llama3:latest"])
+    assert captured["model"] == "llama3:latest"
+
+
+def test_model_flag_used_for_anthropic(monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    captured = {}
+    def fake_adapter(model=None, api_key=None):
+        captured["model"] = model
+        return MagicMock()
+    with patch("diagram_scribe.cli.load_dotenv"), \
+         patch("diagram_scribe.cli.ExcalidrawAdapter"), \
+         patch("diagram_scribe.cli.DiagramScribe"), \
+         patch("diagram_scribe.adapters.llm.claude.ClaudeAdapter", side_effect=fake_adapter), \
+         patch("builtins.input", side_effect=[""]):
+        main(["--model", "claude-opus-4-7"])
+    assert captured["model"] == "claude-opus-4-7"
+
+
+def test_output_flag_sets_excalidraw_path(monkeypatch, tmp_path):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    out = str(tmp_path / "custom.excalidraw")
+    captured = {}
+    def fake_excalidraw(output_path=None):
+        captured["path"] = output_path
+        return MagicMock()
+    with patch("diagram_scribe.cli.load_dotenv"), \
+         patch("diagram_scribe.cli.ExcalidrawAdapter", side_effect=fake_excalidraw), \
+         patch("diagram_scribe.cli.DiagramScribe"), \
          patch("diagram_scribe.adapters.llm.openrouter.OpenAI"), \
          patch("builtins.input", side_effect=[""]):
-        main(["--key", "sk-or-test", "--model", "nvidia/foo:free"])
-    assert os.environ.get("OPENROUTER_API_KEY") == "sk-or-test"
-    assert os.environ.get("OPENROUTER_MODEL") == "nvidia/foo:free"
+        main(["--output", out])
+    assert captured["path"] == out
+
+
+def test_output_env_var_sets_excalidraw_path(monkeypatch, tmp_path):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    out = str(tmp_path / "env.excalidraw")
+    monkeypatch.setenv("DIAGRAM_SCRIBE_OUTPUT", out)
+    captured = {}
+    def fake_excalidraw(output_path=None):
+        captured["path"] = output_path
+        return MagicMock()
+    with patch("diagram_scribe.cli.load_dotenv"), \
+         patch("diagram_scribe.cli.ExcalidrawAdapter", side_effect=fake_excalidraw), \
+         patch("diagram_scribe.cli.DiagramScribe"), \
+         patch("diagram_scribe.adapters.llm.openrouter.OpenAI"), \
+         patch("builtins.input", side_effect=[""]):
+        main([])
+    assert captured["path"] == out
 
 
 # --- Ollama model listing ---

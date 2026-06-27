@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import anthropic
 from ...models import DiagramIR
 from ...prompts import SYSTEM_PROMPT, build_generate_messages, build_refine_messages, parse_ir_response
@@ -26,10 +27,10 @@ class ClaudeAdapter:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "claude-haiku-4-5-20251001",
+        model: str | None = None,
     ):
         self._client = anthropic.Anthropic(api_key=api_key)
-        self._model = model
+        self._model = model or os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 
     def _call(self, messages: list[dict]) -> str:
         response = self._client.messages.create(
