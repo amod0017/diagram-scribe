@@ -21,27 +21,49 @@ _SHAPE_MAP = {
     "box": "rectangle",
     "diamond": "diamond",
     "circle": "ellipse",
-    "cylinder": "rectangle",
+    # "cylinder" and "text" are handled specially below
 }
 
+_NODE_H = 60
+_CAP_H = 20        # height of the ellipse cap on cylinder nodes
+_CHAR_W = 9        # approximate px per character at fontSize 14
+_NODE_PADDING = 40
+_H_GAP = 30        # horizontal gap between sibling nodes
 
-def _layout(nodes: list[Node], edges: list[Edge]) -> dict[str, tuple[float, float]]:
-    """Assign x/y positions to nodes using a simple topological-level layout.
 
-    Nodes with no incoming edges are placed in the top row (level 0).
-    Each subsequent level is 160px below the previous. Nodes at the same
-    level are spaced 220px apart horizontally.
+def _node_width(label: str) -> float:
+    return max(180.0, len(label) * _CHAR_W + _NODE_PADDING)
 
-    This is intentionally simple — Excalidraw's own auto-layout is richer.
-    The goal here is a readable default, not a perfect layout.
+
+def _node_total_height(shape: str) -> float:
+    """Total visual height of a node, including any decorative cap."""
+    return _CAP_H // 2 + _NODE_H if shape == "cylinder" else _NODE_H
+
+
+def _layout(
+    nodes: list[Node],
+    edges: list[Edge],
+    widths: dict[str, float] | None = None,
+) -> dict[str, tuple[float, float]]:
+    """Assign x/y positions using a topological-level layout.
+
+    Nodes with no incoming edges sit at level 0. Each subsequent level is
+    160px below the previous. Siblings at the same level are placed
+    left-to-right with a gap, sized according to their actual label width
+    so they never overlap.
 
     Args:
         nodes: All nodes in the diagram.
         edges: All directed edges.
+        widths: Optional mapping of node id → pixel width. When omitted,
+            180px is assumed for every node.
 
     Returns:
         Mapping of node id → (x, y) pixel coordinates.
     """
+    if widths is None:
+        widths = {}
+
     to_ids = {e.to_id for e in edges}
     starts = [n.id for n in nodes if n.id not in to_ids] or [nodes[0].id]
 
@@ -54,24 +76,15 @@ def _layout(nodes: list[Node], edges: list[Edge]) -> dict[str, tuple[float, floa
         levels[node_id] = level
         queue.extend((e.to_id, level + 1) for e in edges if e.from_id == node_id)
 
-    counts: dict[int, int] = {}
+    level_x: dict[int, float] = {}
     positions: dict[str, tuple[float, float]] = {}
     for node in nodes:
         lvl = levels.get(node.id, 0)
-        pos = counts.get(lvl, 0)
-        counts[lvl] = pos + 1
-        positions[node.id] = (pos * 220.0, lvl * 160.0)
+        x = level_x.get(lvl, 0.0)
+        positions[node.id] = (x, lvl * 160.0)
+        level_x[lvl] = x + widths.get(node.id, 180.0) + _H_GAP
 
     return positions
-
-
-_NODE_H = 60
-_CHAR_W = 9  # approximate px per character at fontSize 14
-_NODE_PADDING = 40
-
-
-def _node_width(label: str) -> float:
-    return max(180.0, len(label) * _CHAR_W + _NODE_PADDING)
 
 
 def _base_element(eid: str, ts: int, **overrides) -> dict:
@@ -103,8 +116,9 @@ def _to_excalidraw(ir: DiagramIR) -> dict:
     Returns:
         A dict matching the Excalidraw file schema.
     """
-    positions = _layout(ir.nodes, ir.edges)
     widths = {n.id: _node_width(n.label) for n in ir.nodes}
+    positions = _layout(ir.nodes, ir.edges, widths)
+    nodes_by_id = {n.id: n for n in ir.nodes}
     elements = []
     ts = int(time.time() * 1000)
 
@@ -112,33 +126,96 @@ def _to_excalidraw(ir: DiagramIR) -> dict:
         x, y = positions.get(node.id, (0.0, 0.0))
         w = widths[node.id]
         text_id = f"{node.id}_text"
-        elements.append(_base_element(node.id, ts,
-            type=_SHAPE_MAP.get(node.shape, "rectangle"),
-            x=x, y=y, width=w, height=_NODE_H,
-            roundness={"type": 3} if node.shape == "box" else None,
-            boundElements=[{"type": "text", "id": text_id}],
-        ))
-        elements.append(_base_element(text_id, ts,
-            type="text",
-            x=x, y=y + (_NODE_H - 20) / 2,
-            width=w, height=20,
-            strokeWidth=1,
-            text=node.label,
-            fontSize=14, fontFamily=1,
-            textAlign="center", verticalAlign="middle",
-            containerId=node.id, baseline=14,
-        ))
+
+        if node.shape == "text":
+            # Floating annotation — no border, no container
+            elements.append(_base_element(node.id, ts,
+                type="text",
+                x=x, y=y + (_NODE_H - 20) / 2,
+                width=w, height=20,
+                strokeWidth=0,
+                text=node.label,
+                fontSize=14, fontFamily=1,
+                textAlign="center", verticalAlign="middle",
+                containerId=None, baseline=14,
+                boundElements=None,
+            ))
+
+        elif node.shape == "cylinder":
+            # Rectangle body (binding target for arrows) + decorative ellipse cap
+            body_y = y + _CAP_H // 2
+            elements.append(_base_element(node.id, ts,
+                type="rectangle",
+                x=x, y=body_y,
+                width=w, height=_NODE_H,
+                roundness=None,
+                boundElements=[{"type": "text", "id": text_id}],
+            ))
+            elements.append(_base_element(f"{node.id}_cap", ts,
+                type="ellipse",
+                x=x, y=y,
+                width=w, height=_CAP_H,
+                roundness=None,
+                boundElements=None,
+            ))
+            elements.append(_base_element(text_id, ts,
+                type="text",
+                x=x, y=body_y + (_NODE_H - 20) / 2,
+                width=w, height=20,
+                strokeWidth=1,
+                text=node.label,
+                fontSize=14, fontFamily=1,
+                textAlign="center", verticalAlign="middle",
+                containerId=node.id, baseline=14,
+            ))
+
+        else:
+            excalidraw_type = _SHAPE_MAP.get(node.shape, "rectangle")
+            elements.append(_base_element(node.id, ts,
+                type=excalidraw_type,
+                x=x, y=y, width=w, height=_NODE_H,
+                roundness={"type": 3} if node.shape == "box" else None,
+                boundElements=[{"type": "text", "id": text_id}],
+            ))
+            elements.append(_base_element(text_id, ts,
+                type="text",
+                x=x, y=y + (_NODE_H - 20) / 2,
+                width=w, height=20,
+                strokeWidth=1,
+                text=node.label,
+                fontSize=14, fontFamily=1,
+                textAlign="center", verticalAlign="middle",
+                containerId=node.id, baseline=14,
+            ))
 
     for i, edge in enumerate(ir.edges):
         edge_id = f"edge_{i}"
         sx, sy = positions.get(edge.from_id, (0.0, 0.0))
         ex, ey = positions.get(edge.to_id, (0.0, 0.0))
-        sw, ew = widths.get(edge.from_id, 180.0), widths.get(edge.to_id, 180.0)
-        # bottom-center of source → top-center of destination
-        start_x = sx + sw / 2
-        start_y = sy + _NODE_H
-        dx = (ex + ew / 2) - start_x
-        dy = ey - start_y
+        sw = widths.get(edge.from_id, 180.0)
+        ew = widths.get(edge.to_id, 180.0)
+        from_shape = nodes_by_id[edge.from_id].shape if edge.from_id in nodes_by_id else "box"
+
+        same_level = abs(sy - ey) < 10
+        if same_level:
+            # Side-to-side: right edge of source → left edge of dest (or reversed)
+            if ex >= sx:
+                start_x = sx + sw
+                start_y = sy + _NODE_H / 2
+                dx = ex - start_x
+            else:
+                start_x = sx
+                start_y = sy + _NODE_H / 2
+                dx = (ex + ew) - start_x
+            dy = 0.0
+        else:
+            # Bottom-center of source → top-center of dest
+            from_h = _node_total_height(from_shape)
+            start_x = sx + sw / 2
+            start_y = sy + from_h
+            dx = (ex + ew / 2) - start_x
+            dy = ey - start_y
+
         elements.append(_base_element(edge_id, ts,
             type="arrow",
             x=start_x, y=start_y,

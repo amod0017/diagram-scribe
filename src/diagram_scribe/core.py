@@ -56,7 +56,7 @@ class DiagramScribe:
         from .adapters.backend.excalidraw import ExcalidrawAdapter
         return ExcalidrawAdapter()
 
-    def draw(self, description: str) -> None:
+    def draw(self, description: str) -> DiagramIR:
         """Generate a new diagram from a natural language description.
 
         Replaces any previously drawn diagram. The LLM converts the
@@ -64,11 +64,15 @@ class DiagramScribe:
 
         Args:
             description: Plain English description of the diagram to create.
+
+        Returns:
+            The generated ``DiagramIR``.
         """
         self._current_ir = self._llm.generate(description)
         self._backend.render(self._current_ir)
+        return self._current_ir
 
-    def refine(self, feedback: str) -> None:
+    def refine(self, feedback: str) -> DiagramIR:
         """Update the current diagram based on feedback.
 
         Must be called after :meth:`draw`. The LLM receives the current
@@ -78,6 +82,9 @@ class DiagramScribe:
         Args:
             feedback: Plain English instruction describing what to change.
 
+        Returns:
+            The updated ``DiagramIR``.
+
         Raises:
             RuntimeError: If called before :meth:`draw`.
         """
@@ -85,3 +92,4 @@ class DiagramScribe:
             raise RuntimeError("Call draw() before refine()")
         self._current_ir = self._llm.refine(feedback, self._current_ir)
         self._backend.render(self._current_ir)
+        return self._current_ir

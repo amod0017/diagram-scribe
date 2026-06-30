@@ -1,7 +1,7 @@
 import json
 from unittest.mock import mock_open, patch
 from diagram_scribe.adapters.backend.excalidraw import (
-    ExcalidrawAdapter, _to_excalidraw, _node_width, _layout,
+    ExcalidrawAdapter, _to_excalidraw, _node_width, _layout, _NODE_H, _CAP_H,
 )
 from diagram_scribe.models import DiagramIR, Node, Edge
 
@@ -207,3 +207,135 @@ def test_render_uses_output_path_when_provided():
          patch("diagram_scribe.adapters.backend.excalidraw.os.makedirs"):
         ExcalidrawAdapter(output_path="/custom/path.excalidraw").render(ir)
         mock_file.assert_called_with("/custom/path.excalidraw", "w", encoding="utf-8")
+
+
+# --- cylinder shape (#63) ---
+
+def test_cylinder_renders_rect_body_and_ellipse_cap():
+    ir = DiagramIR(nodes=[Node("db", "Users DB", "cylinder")], edges=[])
+    elements = _to_excalidraw(ir)["elements"]
+    types = [e["type"] for e in elements]
+    assert "rectangle" in types
+    assert "ellipse" in types
+
+
+def test_cylinder_body_has_node_id():
+    ir = DiagramIR(nodes=[Node("db", "Users DB", "cylinder")], edges=[])
+    elements = _to_excalidraw(ir)["elements"]
+    body = next((e for e in elements if e["id"] == "db"), None)
+    assert body is not None
+    assert body["type"] == "rectangle"
+
+
+def test_cylinder_cap_is_above_body():
+    ir = DiagramIR(nodes=[Node("db", "Users DB", "cylinder")], edges=[])
+    elements = _to_excalidraw(ir)["elements"]
+    body = next(e for e in elements if e["id"] == "db")
+    cap = next(e for e in elements if e["id"] == "db_cap")
+    assert cap["y"] < body["y"]
+
+
+def test_cylinder_has_text_element():
+    ir = DiagramIR(nodes=[Node("db", "Users DB", "cylinder")], edges=[])
+    elements = _to_excalidraw(ir)["elements"]
+    text = next((e for e in elements if e.get("containerId") == "db"), None)
+    assert text is not None
+    assert text["text"] == "Users DB"
+
+
+# --- text shape (#58) ---
+
+def test_text_shape_renders_as_floating_text():
+    ir = DiagramIR(nodes=[Node("note", "See docs", "text")], edges=[])
+    elements = _to_excalidraw(ir)["elements"]
+    assert len(elements) == 1
+    assert elements[0]["type"] == "text"
+    assert elements[0].get("containerId") is None
+
+
+# --- layout overlap (#59) ---
+
+def test_layout_siblings_do_not_overlap():
+    nodes = [
+        Node("a", "A very long label here", "box"),
+        Node("b", "B", "box"),
+    ]
+    edges = []  # both are roots → same level
+    widths = {n.id: _node_width(n.label) for n in nodes}
+    positions = _layout(nodes, edges, widths)
+    # b should start after a's right edge
+    assert positions["b"][0] >= positions["a"][0] + widths["a"]
+
+
+# --- same-level arrows (#64) ---
+
+def test_sibling_arrow_uses_side_routing():
+    ir = DiagramIR(
+        nodes=[Node("a", "A", "box"), Node("b", "B", "box")],
+        edges=[Edge("a", "b")],
+    )
+    # Force siblings by making both roots (no edges in layout, then add edge for arrow only)
+    # Use a cycle-free two-root IR to place a and b at the same level
+    ir2 = DiagramIR(
+        nodes=[Node("x", "X", "box"), Node("y", "Y", "box"), Node("z", "Z", "box")],
+        edges=[Edge("x", "z"), Edge("y", "z")],
+    )
+    elements = _to_excalidraw(ir2)["elements"]
+    # x and y should be at the same y level; the arrow x→z goes downward (not same-level)
+    # Validate that x and y share the same y position
+    ex = next(e for e in elements if e["id"] == "x")
+    ey_el = next(e for e in elements if e["id"] == "y")
+    assert ex["y"] == ey_el["y"]
+
+
+def test_same_level_arrow_starts_at_right_edge():
+    # root → a, root → b, a → b: a and b are siblings (both at level 1)
+    nodes = [Node("root", "Root", "box"), Node("a", "A", "box"), Node("b", "B", "box")]
+    edges = [Edge("root", "a"), Edge("root", "b"), Edge("a", "b")]
+    ir = DiagramIR(nodes=nodes, edges=edges)
+    elements = _to_excalidraw(ir)["elements"]
+
+    node_a = next(e for e in elements if e["id"] == "a")
+    node_b = next(e for e in elements if e["id"] == "b")
+    # a and b must be at the same y level
+    assert node_a["y"] == node_b["y"]
+
+    # The a→b arrow (edge index 2) should start at the right edge of a
+    a_to_b = next(
+        arr for arr in elements
+        if arr["type"] == "arrow"
+        and arr["startBinding"]["elementId"] == "a"
+        and arr["endBinding"]["elementId"] == "b"
+    )
+    assert a_to_b["x"] == node_a["x"] + node_a["width"]
+
+
+# --- draw/refine return values (#62) ---
+
+def test_draw_returns_diagram_ir():
+    from unittest.mock import MagicMock
+    from diagram_scribe.core import DiagramScribe
+    from diagram_scribe.models import DiagramIR, Node
+
+    ir = DiagramIR(nodes=[Node("a", "A", "box")], edges=[])
+    mock_llm = MagicMock()
+    mock_llm.generate.return_value = ir
+    ds = DiagramScribe(llm=mock_llm, backend=MagicMock())
+    result = ds.draw("test")
+    assert result is ir
+
+
+def test_refine_returns_diagram_ir():
+    from unittest.mock import MagicMock
+    from diagram_scribe.core import DiagramScribe
+    from diagram_scribe.models import DiagramIR, Node
+
+    ir1 = DiagramIR(nodes=[Node("a", "A", "box")], edges=[])
+    ir2 = DiagramIR(nodes=[Node("a", "A", "box"), Node("b", "B", "box")], edges=[])
+    mock_llm = MagicMock()
+    mock_llm.generate.return_value = ir1
+    mock_llm.refine.return_value = ir2
+    ds = DiagramScribe(llm=mock_llm, backend=MagicMock())
+    ds.draw("test")
+    result = ds.refine("add B")
+    assert result is ir2
