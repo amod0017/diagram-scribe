@@ -174,6 +174,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--key", metavar="API_KEY", help="OpenRouter API key (overrides .env)")
     parser.add_argument("--model", metavar="MODEL", help="Model to use for the active provider (overrides .env)")
     parser.add_argument("--output", metavar="PATH", help="Output .excalidraw file path (overrides DIAGRAM_SCRIBE_OUTPUT)")
+    parser.add_argument(
+        "--type", metavar="TYPE",
+        choices=["flowchart", "sequence", "er", "architecture", "mindmap", "class"],
+        help="Diagram type hint: flowchart, sequence, er, architecture, mindmap, class",
+    )
     return parser.parse_args(argv)
 
 
@@ -205,8 +210,16 @@ def main(argv: list[str] | None = None):
     if not description:
         return
 
+    if args.type:
+        description = f"[{args.type} diagram] {description}"
+
     print("Generating diagram...")
-    ds.draw(description)
+    try:
+        ds.draw(description)
+    except Exception as e:
+        print(f"Failed to generate diagram: {e}")
+        print("The LLM returned an unexpected response. Try rephrasing your description.")
+        return
     print(f"[diagram saved to {backend._output_path}]\n")
 
     while True:
@@ -215,8 +228,12 @@ def main(argv: list[str] | None = None):
             print("Done.")
             break
         print("Updating diagram...")
-        ds.refine(feedback)
-        print("[diagram updated]\n")
+        try:
+            ds.refine(feedback)
+            print("[diagram updated]\n")
+        except Exception as e:
+            print(f"Failed to update diagram: {e}")
+            print("Try rephrasing your feedback.")
 
 
 if __name__ == "__main__":

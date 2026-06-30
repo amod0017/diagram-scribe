@@ -139,6 +139,18 @@ def test_parse_args_defaults_are_none():
     assert args.key is None
     assert args.model is None
     assert args.output is None
+    assert args.type is None
+
+
+def test_parse_args_type_flag():
+    args = _parse_args(["--type", "sequence"])
+    assert args.type == "sequence"
+
+
+def test_parse_args_type_rejects_unknown():
+    import pytest
+    with pytest.raises(SystemExit):
+        _parse_args(["--type", "foobar"])
 
 
 def test_parse_args_key_flag():
@@ -293,3 +305,43 @@ def test_fetch_ollama_models_returns_empty_on_failure():
     with patch("diagram_scribe.cli.OpenAI", side_effect=Exception("connection refused")):
         models = _fetch_ollama_models()
     assert models == []
+
+
+# --- error handling (#57) ---
+
+def test_draw_exception_prints_error_and_returns(capsys):
+    mock_ds = MagicMock()
+    mock_ds.draw.side_effect = ValueError("invalid JSON from LLM")
+    with patch("diagram_scribe.cli._build_llm", return_value=MagicMock()), \
+         patch("diagram_scribe.cli.DiagramScribe", return_value=mock_ds), \
+         patch("diagram_scribe.cli.load_dotenv"), \
+         patch("builtins.input", side_effect=["login flow"]):
+        main([])
+    out = capsys.readouterr().out
+    assert "Failed to generate" in out
+
+
+def test_refine_exception_prints_error_and_continues(capsys):
+    mock_ds = MagicMock()
+    mock_ds.refine.side_effect = ValueError("bad response")
+    with patch("diagram_scribe.cli._build_llm", return_value=MagicMock()), \
+         patch("diagram_scribe.cli.DiagramScribe", return_value=mock_ds), \
+         patch("diagram_scribe.cli.load_dotenv"), \
+         patch("builtins.input", side_effect=["login flow", "add a step", ""]):
+        main([])
+    out = capsys.readouterr().out
+    assert "Failed to update" in out
+
+
+# --- --type flag (#61) ---
+
+def test_type_flag_prepended_to_description():
+    mock_ds = MagicMock()
+    with patch("diagram_scribe.cli._build_llm", return_value=MagicMock()), \
+         patch("diagram_scribe.cli.DiagramScribe", return_value=mock_ds), \
+         patch("diagram_scribe.cli.load_dotenv"), \
+         patch("builtins.input", side_effect=["user logs in", ""]):
+        main(["--type", "sequence"])
+    call_desc = mock_ds.draw.call_args[0][0]
+    assert "sequence" in call_desc
+    assert "user logs in" in call_desc
