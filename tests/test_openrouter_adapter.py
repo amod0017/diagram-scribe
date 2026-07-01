@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 from diagram_scribe.adapters.llm.openrouter import OpenRouterAdapter
-from diagram_scribe.models import DiagramIR, Node
+from diagram_scribe.models import DiagramIR, MermaidIR, Node
 
 _VALID_JSON = '{"nodes": [{"id": "a", "label": "Start", "shape": "circle"}], "edges": []}'
 
@@ -57,3 +57,29 @@ def test_refine_returns_updated_ir():
         ir = adapter.refine("add a step", current)
 
         assert isinstance(ir, DiagramIR)
+
+
+def test_generate_returns_mermaid_ir_when_format_mermaid():
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = (
+        "FORMAT: mermaid\nflowchart TD\n  A --> B"
+    )
+    with patch("diagram_scribe.adapters.llm.openrouter.OpenAI") as mock_openai:
+        mock_openai.return_value.chat.completions.create.return_value = mock_response
+        adapter = OpenRouterAdapter(api_key="test", model="test-model")
+        result = adapter.generate("login flow")
+    assert isinstance(result, MermaidIR)
+    assert "flowchart TD" in result.source
+
+
+def test_refine_passes_mermaid_ir_correctly():
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = (
+        "FORMAT: mermaid\nflowchart TD\n  A --> B --> C"
+    )
+    current = MermaidIR(source="flowchart TD\n  A --> B", diagram_type="flowchart")
+    with patch("diagram_scribe.adapters.llm.openrouter.OpenAI") as mock_openai:
+        mock_openai.return_value.chat.completions.create.return_value = mock_response
+        adapter = OpenRouterAdapter(api_key="test", model="test-model")
+        result = adapter.refine("add C node", current)
+    assert isinstance(result, MermaidIR)
