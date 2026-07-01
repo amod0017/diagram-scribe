@@ -1,0 +1,14 @@
+{
+  "name": "diagram-scribe-mermaid-converter",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "@excalidraw/mermaid-to-excalidraw": "^0.3.0",
+    "jsdom": "^24.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.0"
+  }
+}
