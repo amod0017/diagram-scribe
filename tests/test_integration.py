@@ -1,6 +1,8 @@
 import json
 import os
+import shutil
 import pytest
+from unittest.mock import patch, MagicMock
 from diagram_scribe import DiagramScribe
 from diagram_scribe.adapters.backend.excalidraw import ExcalidrawAdapter
 
@@ -61,6 +63,52 @@ def test_openrouter_generates_valid_excalidraw(tmp_path):
     data = json.loads(output.read_text())
     assert data["type"] == "excalidraw"
     assert len(data["elements"]) >= 2
+
+
+@pytest.mark.integration
+def test_mermaid_path_writes_valid_excalidraw(tmp_path):
+    """Full Mermaid path: MermaidIR → real Node.js bundle → .excalidraw file."""
+    if not shutil.which("node"):
+        pytest.skip("Node.js not installed")
+
+    from diagram_scribe.models import MermaidIR
+    from diagram_scribe.adapters.backend.mermaid import MermaidAdapter
+
+    output = tmp_path / "mermaid.excalidraw"
+    adapter = MermaidAdapter(output_path=str(output))
+
+    ir = MermaidIR(source="flowchart TD\n  A[Start] --> B[End]", diagram_type="flowchart")
+    with patch("diagram_scribe.adapters.backend.mermaid.webbrowser.open"):
+        adapter.render(ir)
+
+    assert output.exists(), "MermaidAdapter did not write file"
+    data = json.loads(output.read_text())
+    assert data["type"] == "excalidraw"
+    assert len(data["elements"]) >= 1, "Expected at least 1 element from Mermaid conversion"
+
+
+@pytest.mark.integration
+def test_diagram_scribe_routes_mermaid_ir_end_to_end(tmp_path):
+    """DiagramScribe routes MermaidIR to MermaidAdapter through the real Node.js bundle."""
+    if not shutil.which("node"):
+        pytest.skip("Node.js not installed")
+
+    from diagram_scribe.models import MermaidIR
+
+    output = tmp_path / "mermaid.excalidraw"
+    mermaid_ir = MermaidIR(source="flowchart TD\n  A[Start] --> B[End]", diagram_type="flowchart")
+
+    mock_llm = MagicMock()
+    mock_llm.generate.return_value = mermaid_ir
+
+    ds = DiagramScribe(llm=mock_llm, output_path=str(output))
+    with patch("diagram_scribe.adapters.backend.mermaid.webbrowser.open"):
+        ds.draw("a simple flowchart")
+
+    assert output.exists(), "DiagramScribe did not write .excalidraw file for MermaidIR"
+    data = json.loads(output.read_text())
+    assert data["type"] == "excalidraw"
+    assert len(data["elements"]) >= 1
 
 
 @pytest.mark.integration
