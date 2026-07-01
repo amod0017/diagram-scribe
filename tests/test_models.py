@@ -1,4 +1,4 @@
-from diagram_scribe.models import Node, Edge, DiagramIR
+from diagram_scribe.models import Node, Edge, DiagramIR, MermaidIR
 
 
 def test_node_creation():
@@ -32,3 +32,14 @@ def test_diagram_ir_empty_by_default():
     ir = DiagramIR()
     assert ir.nodes == []
     assert ir.edges == []
+
+
+def test_mermaid_ir_creation():
+    ir = MermaidIR(source="flowchart TD\n  A --> B", diagram_type="flowchart")
+    assert ir.source == "flowchart TD\n  A --> B"
+    assert ir.diagram_type == "flowchart"
+
+
+def test_mermaid_ir_default_diagram_type():
+    ir = MermaidIR(source="graph LR\n  A --> B")
+    assert ir.diagram_type == "flowchart"

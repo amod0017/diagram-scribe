@@ -44,3 +44,16 @@ class DiagramIR:
     """
     nodes: list[Node] = field(default_factory=list)
     edges: list[Edge] = field(default_factory=list)
+
+
+@dataclass
+class MermaidIR:
+    """Intermediate representation for Mermaid-rendered diagrams.
+
+    Attributes:
+        source: Raw Mermaid diagram text (e.g. ``flowchart TD\\n  A --> B``).
+        diagram_type: Mermaid diagram keyword (flowchart, sequenceDiagram, etc.).
+            Used for logging and debugging.
+    """
+    source: str
+    diagram_type: str = "flowchart"
