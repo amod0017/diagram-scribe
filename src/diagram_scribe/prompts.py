@@ -18,7 +18,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import re
-from .models import DiagramIR, Node, Edge
+from .models import DiagramIR, MermaidIR, Node, Edge
 
 SYSTEM_PROMPT = """\
 You are a diagram generator. Given a description, return a JSON object.
@@ -118,3 +118,61 @@ def parse_ir_response(text: str) -> DiagramIR:
         for e in data.get("edges", [])
     ]
     return DiagramIR(nodes=nodes, edges=edges)
+
+
+def parse_response(text: str) -> DiagramIR | MermaidIR:
+    """Parse an LLM response that begins with a FORMAT header.
+
+    Strips think tags, reads the first line to determine format, then
+    dispatches to ``parse_ir_response`` for graph responses or constructs
+    a ``MermaidIR`` for mermaid responses. Falls back to ``parse_ir_response``
+    when no FORMAT header is present (backward compatibility).
+
+    Args:
+        text: Raw LLM response text.
+
+    Returns:
+        A ``MermaidIR`` or ``DiagramIR`` depending on the FORMAT header.
+    """
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+
+    lines = text.split("\n", 1)
+    first_line = lines[0].strip()
+    rest = lines[1].strip() if len(lines) > 1 else ""
+
+    if first_line == "FORMAT: mermaid":
+        source = rest.strip()
+        first_word = source.split()[0] if source.split() else "flowchart"
+        return MermaidIR(source=source, diagram_type=first_word)
+
+    if first_line == "FORMAT: graph":
+        return parse_ir_response(rest)
+
+    # No FORMAT header — treat entire text as DiagramIR JSON (backward compat)
+    return parse_ir_response(text)
+
+
+def build_mermaid_refine_messages(feedback: str, current: MermaidIR) -> list[dict]:
+    """Build the messages list for a refine() call on a Mermaid diagram.
+
+    Includes the current Mermaid source so the LLM can produce an updated
+    version incorporating the feedback.
+
+    Args:
+        feedback: Plain English instruction for what to change.
+        current: The current Mermaid diagram state.
+
+    Returns:
+        A list of message dicts in the chat API format.
+    """
+    return [
+        {
+            "role": "user",
+            "content": (
+                f"Current diagram (Mermaid):\n{current.source}\n\n"
+                f"Feedback: {feedback}\n\n"
+                "Return the updated diagram. "
+                "Remember: first line must be FORMAT: mermaid, then the Mermaid code."
+            ),
+        }
+    ]
