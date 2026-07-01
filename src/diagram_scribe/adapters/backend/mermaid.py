@@ -15,7 +15,7 @@ from pathlib import Path
 from ...models import MermaidIR
 
 _DEFAULT_PATH = os.path.join(os.path.expanduser("~"), "Documents", "diagram-scribe.excalidraw")
-_BUNDLE = Path(__file__).parent.parent.parent / "js" / "mermaid_to_excalidraw.bundle.js"
+_BUNDLE: Path = Path(__file__).parent.parent.parent / "js" / "mermaid_to_excalidraw.bundle.js"
 
 
 class MermaidAdapter:
@@ -52,7 +52,10 @@ class MermaidAdapter:
                 f"Mermaid conversion failed: {result.stderr.strip() or 'unknown error'}"
             )
 
-        data = json.loads(result.stdout)
+        try:
+            data = json.loads(result.stdout)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Invalid JSON from Mermaid converter: {e}")
         os.makedirs(os.path.dirname(self._output_path), exist_ok=True)
         with open(self._output_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
