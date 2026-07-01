@@ -21,7 +21,34 @@ import re
 from .models import DiagramIR, MermaidIR, Node, Edge
 
 SYSTEM_PROMPT = """\
-You are a diagram generator. Given a description, return a JSON object.
+You are a diagram generator. Given a description, choose the best output format and generate the diagram.
+
+IMPORTANT: The FIRST line of your response MUST be one of:
+  FORMAT: mermaid
+  FORMAT: graph
+
+Choose FORMAT based on the diagram type:
+- flowchart, sequence diagram, ER diagram, class diagram → FORMAT: mermaid
+- architecture diagram, mindmap, simple spatial layout (3-6 nodes) → FORMAT: graph
+- If the description specifies a type (e.g. "[sequence diagram]"), follow it
+
+---
+If FORMAT: mermaid, output valid Mermaid code after the FORMAT line.
+
+Mermaid diagram types:
+- flowchart TD  — top-down flowchart (decisions, processes, workflows)
+- sequenceDiagram — interactions between actors over time
+- erDiagram — entity-relationship diagrams
+- classDiagram — class/type hierarchies
+- graph LR — left-to-right simple flow
+
+Mermaid rules:
+- Keep node labels short (4-6 words max)
+- Use |label| on edges for decision branches (yes/no, success/failure)
+- Do NOT wrap in markdown code fences
+
+---
+If FORMAT: graph, output a JSON object after the FORMAT line.
 
 Schema:
 {
@@ -30,24 +57,19 @@ Schema:
 }
 
 Shape guide:
-- "box": process steps, actions, tasks, services, components, classes, entities
-- "diamond": decisions, conditions, branches, gateways
-- "circle": start/end points, events, actors, users
-- "cylinder": databases, storage systems, queues, caches
-- "text": floating annotations or notes (no border; avoid connecting edges to these)
+- "box": services, components, steps, classes, entities
+- "diamond": decisions, conditions
+- "circle": start/end points, actors
+- "cylinder": databases, queues, storage
+- "text": floating annotations (no border)
 
-Diagram type guide — follow these conventions when a type is specified or implied:
-- Flowchart: circle (start/end), box (steps), diamond (decisions), label decision edges "yes"/"no"
-- Sequence diagram: circle (actors/systems), box (messages as ordered steps), label edges with the action name
-- ER diagram: box (entities), cylinder (tables/stores), diamond (relationships), label edges with cardinality
-- Architecture diagram: box (services), cylinder (databases), label edges with protocols or data types
-- Mind map: circle (central topic), box (branches and sub-topics)
-- Class diagram: box (classes), label edges with relationship type (extends, implements, uses)
+Graph rules:
+- Use short snake_case ids (e.g. "api_gateway", "user_db")
+- Keep labels concise (4-6 words max)
+- Return ONLY valid JSON — no markdown, no explanation
 
-Rules:
-- Use short snake_case ids (e.g. "validate_token", "deploy_staging")
-- Label edges on decisions (e.g. "yes", "no", "success", "failure")
-- Return ONLY valid JSON. No markdown, no explanation.
+---
+Return ONLY the FORMAT line followed by the diagram. No preamble, no explanation.
 """
 
 
