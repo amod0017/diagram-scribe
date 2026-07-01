@@ -142,7 +142,9 @@ def parse_response(text: str) -> DiagramIR | MermaidIR:
 
     if first_line == "FORMAT: mermaid":
         source = rest.strip()
-        first_word = source.split()[0] if source.split() else "flowchart"
+        if not source:
+            raise ValueError("LLM returned FORMAT: mermaid with no diagram content")
+        first_word = source.split()[0]
         return MermaidIR(source=source, diagram_type=first_word)
 
     if first_line == "FORMAT: graph":
@@ -165,6 +167,8 @@ def build_mermaid_refine_messages(feedback: str, current: MermaidIR) -> list[dic
     Returns:
         A list of message dicts in the chat API format.
     """
+    if not current.source:
+        raise ValueError("Cannot refine a MermaidIR with empty source")
     return [
         {
             "role": "user",

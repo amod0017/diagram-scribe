@@ -121,3 +121,15 @@ def test_build_mermaid_refine_messages_includes_source_and_feedback():
     assert "flowchart TD" in messages[0]["content"]
     assert "add a C node" in messages[0]["content"]
     assert "FORMAT: mermaid" in messages[0]["content"]
+
+
+def test_parse_response_raises_on_empty_mermaid_body():
+    import pytest
+    with pytest.raises(ValueError, match="no diagram content"):
+        parse_response("FORMAT: mermaid\n")
+
+
+def test_build_mermaid_refine_messages_raises_on_empty_source():
+    import pytest
+    with pytest.raises(ValueError, match="empty source"):
+        build_mermaid_refine_messages("add C", MermaidIR(source=""))
