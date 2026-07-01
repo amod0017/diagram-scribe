@@ -201,7 +201,7 @@ def main(argv: list[str] | None = None):
 
     output_path = args.output or os.getenv("DIAGRAM_SCRIBE_OUTPUT")
     backend = ExcalidrawAdapter(output_path=output_path)
-    ds = DiagramScribe(llm=llm, backend=backend)
+    ds = DiagramScribe(llm=llm, backend=backend, output_path=output_path)
 
     print("DiagramScribe — describe your diagram in plain English.")
     print("Press Enter on an empty line to quit.\n")
