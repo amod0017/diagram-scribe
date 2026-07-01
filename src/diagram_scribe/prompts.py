@@ -1,18 +1,21 @@
 """Prompt construction and response parsing for LLM adapters.
 
-All LLM adapters share the same prompts and the same JSON schema. This
-module keeps that logic in one place so changing the prompt affects every
-adapter at once.
+All LLM adapters share the same system prompt and response parser. The LLM
+chooses between two output formats based on the diagram type:
 
-The LLM is always asked to return a JSON object with this shape::
+**FORMAT: mermaid** — for flowcharts, sequence diagrams, ER diagrams, class
+diagrams. The LLM outputs valid Mermaid code after the header line.
+
+**FORMAT: graph** — for architecture diagrams, mindmaps, and simple spatial
+layouts. The LLM outputs a JSON object::
 
     {
       "nodes": [{"id": "...", "label": "...", "shape": "..."}],
       "edges": [{"from_id": "...", "to_id": "...", "label": "..."}]
     }
 
-``shape`` must be one of "box", "diamond", "circle", "cylinder".
-``label`` on edges is optional.
+``parse_response()`` reads the FORMAT header and returns either a
+``DiagramIR`` (graph path) or a ``MermaidIR`` (mermaid path).
 """
 from __future__ import annotations
 import dataclasses
@@ -107,7 +110,7 @@ def build_refine_messages(feedback: str, current: DiagramIR) -> list[dict]:
             "content": (
                 f"Current diagram:\n{current_json}\n\n"
                 f"Feedback: {feedback}\n\n"
-                "Return the updated diagram as JSON."
+                "Return FORMAT: graph followed by the updated diagram as JSON."
             ),
         }
     ]
