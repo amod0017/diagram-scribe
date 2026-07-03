@@ -355227,7 +355227,124 @@ var dom = new JSDOM("<!DOCTYPE html><html><body></body></html>");
 global.window = dom.window;
 global.document = dom.window.document;
 Object.defineProperty(global, "navigator", { value: dom.window.navigator, writable: true });
-dom.window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 100, height: 30 });
+var HELVETICA_WIDTHS = {
+  " ": 278,
+  "!": 278,
+  '"': 355,
+  "#": 556,
+  "$": 556,
+  "%": 889,
+  "&": 667,
+  "'": 222,
+  "(": 333,
+  ")": 333,
+  "*": 389,
+  "+": 584,
+  ",": 278,
+  "-": 333,
+  ".": 278,
+  "/": 278,
+  "0": 556,
+  "1": 556,
+  "2": 556,
+  "3": 556,
+  "4": 556,
+  "5": 556,
+  "6": 556,
+  "7": 556,
+  "8": 556,
+  "9": 556,
+  ":": 278,
+  ";": 278,
+  "<": 584,
+  "=": 584,
+  ">": 584,
+  "?": 556,
+  "@": 1015,
+  "A": 667,
+  "B": 667,
+  "C": 722,
+  "D": 722,
+  "E": 667,
+  "F": 611,
+  "G": 778,
+  "H": 722,
+  "I": 278,
+  "J": 500,
+  "K": 667,
+  "L": 611,
+  "M": 833,
+  "N": 722,
+  "O": 778,
+  "P": 667,
+  "Q": 778,
+  "R": 722,
+  "S": 667,
+  "T": 611,
+  "U": 722,
+  "V": 667,
+  "W": 944,
+  "X": 667,
+  "Y": 667,
+  "Z": 611,
+  "[": 278,
+  "\\": 278,
+  "]": 278,
+  "^": 469,
+  "_": 556,
+  "`": 222,
+  "a": 556,
+  "b": 556,
+  "c": 500,
+  "d": 556,
+  "e": 556,
+  "f": 278,
+  "g": 556,
+  "h": 556,
+  "i": 222,
+  "j": 222,
+  "k": 500,
+  "l": 222,
+  "m": 833,
+  "n": 556,
+  "o": 556,
+  "p": 556,
+  "q": 556,
+  "r": 333,
+  "s": 500,
+  "t": 278,
+  "u": 556,
+  "v": 500,
+  "w": 722,
+  "x": 500,
+  "y": 500,
+  "z": 500,
+  "{": 334,
+  "|": 260,
+  "}": 334,
+  "~": 584
+};
+var DISPLAY_FONT_SIZE = 20;
+function measureNodeWidth(text5) {
+  let w2 = 0;
+  for (const ch of text5) w2 += (HELVETICA_WIDTHS[ch] ?? 556) * DISPLAY_FONT_SIZE / 1e3;
+  return Math.max(w2 + 40, 80);
+}
+var _labelSizeQueue = [];
+dom.window.SVGElement.prototype.getBBox = function() {
+  const text5 = (this.textContent || "").trim();
+  if (text5 && this.tagName === "foreignObject") {
+    const w2 = measureNodeWidth(text5);
+    const h = DISPLAY_FONT_SIZE * 2;
+    _labelSizeQueue.push({ w: w2, h });
+    return { x: 0, y: 0, width: w2, height: h };
+  }
+  if (this.getAttribute && this.getAttribute("data-node") === "true" && _labelSizeQueue.length > 0) {
+    const { w: w2, h } = _labelSizeQueue.shift();
+    return { x: 0, y: 0, width: w2, height: h };
+  }
+  return { x: 0, y: 0, width: 10, height: 10 };
+};
 var BASE_PROPS = {
   angle: 0,
   strokeColor: "#1e1e1e",
@@ -355248,6 +355365,58 @@ var BASE_PROPS = {
 function seed() {
   return Math.floor(Math.random() * 99999) + 1;
 }
+function fixOverlaps(skeletonElements) {
+  const NODE_GAP = 30;
+  const LEVEL_TOLERANCE = 5;
+  const nodes5 = skeletonElements.filter((e) => e.type !== "arrow");
+  const arrows2 = skeletonElements.filter((e) => e.type === "arrow");
+  const levels = [];
+  for (const node3 of nodes5) {
+    const existing = levels.find((lv) => Math.abs(lv.y - node3.y) <= LEVEL_TOLERANCE);
+    if (existing) {
+      existing.nodes.push(node3);
+    } else {
+      levels.push({ y: node3.y, nodes: [node3] });
+    }
+  }
+  for (const level of levels) {
+    if (level.nodes.length < 2) continue;
+    level.nodes.sort((a, b) => a.x - b.x);
+    let hasOverlap = false;
+    for (let i = 1; i < level.nodes.length; i++) {
+      const prev2 = level.nodes[i - 1];
+      const curr = level.nodes[i];
+      if (prev2.x + prev2.width + NODE_GAP > curr.x) {
+        hasOverlap = true;
+        break;
+      }
+    }
+    if (!hasOverlap) continue;
+    const totalWidth = level.nodes.reduce((s, n) => s + n.width, 0);
+    const span = totalWidth + NODE_GAP * (level.nodes.length - 1);
+    const centroid = level.nodes.reduce((s, n) => s + n.x + n.width / 2, 0) / level.nodes.length;
+    let x3 = centroid - span / 2;
+    for (const node3 of level.nodes) {
+      node3.x = x3;
+      x3 += node3.width + NODE_GAP;
+    }
+  }
+  const nodeById = new Map(nodes5.map((n) => [n.id, n]));
+  for (const arrow of arrows2) {
+    const src = arrow.start ? nodeById.get(arrow.start.id) : null;
+    const dst = arrow.end ? nodeById.get(arrow.end.id) : null;
+    if (!src || !dst) continue;
+    const ARROW_GAP = 8;
+    const sx = src.x + src.width / 2;
+    const sy = src.y + src.height + ARROW_GAP;
+    const ex = dst.x + dst.width / 2;
+    const ey = dst.y - ARROW_GAP;
+    arrow.x = sx;
+    arrow.y = sy;
+    arrow.points = [[0, 0], [ex - sx, ey - sy]];
+  }
+  return skeletonElements;
+}
 function convertElements(skeletonElements) {
   const result = [];
   for (const el of skeletonElements) {
@@ -355258,7 +355427,7 @@ function convertElements(skeletonElements) {
       const arrow = {
         ...BASE_PROPS,
         seed: seed(),
-        roundness: el.roundness || { type: 2 },
+        roundness: { type: 2 },
         lastCommittedPoint: null,
         startArrowhead: null,
         endArrowhead: "arrow",
@@ -355313,7 +355482,8 @@ function convertElements(skeletonElements) {
     process.exit(1);
   }
   const { elements: skeletonElements, files } = await parseMermaidToExcalidraw2(mermaidSource);
-  const elements3 = convertElements(skeletonElements);
+  const fixed = fixOverlaps(skeletonElements);
+  const elements3 = convertElements(fixed);
   const output2 = {
     type: "excalidraw",
     version: 2,
