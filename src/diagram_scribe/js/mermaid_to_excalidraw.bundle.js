@@ -355326,9 +355326,12 @@ var HELVETICA_WIDTHS = {
 };
 var DISPLAY_FONT_SIZE = 20;
 function measureNodeWidth(text5) {
+  return Math.max(measureText(text5, DISPLAY_FONT_SIZE) + 40, 80);
+}
+function measureText(text5, fontSize) {
   let w2 = 0;
-  for (const ch of text5) w2 += (HELVETICA_WIDTHS[ch] ?? 556) * DISPLAY_FONT_SIZE / 1e3;
-  return Math.max(w2 + 40, 80);
+  for (const ch of text5) w2 += (HELVETICA_WIDTHS[ch] ?? 556) * fontSize / 1e3;
+  return w2;
 }
 var _labelSizeQueue = [];
 dom.window.SVGElement.prototype.getBBox = function() {
@@ -355342,6 +355345,12 @@ dom.window.SVGElement.prototype.getBBox = function() {
   if (this.getAttribute && this.getAttribute("data-node") === "true" && _labelSizeQueue.length > 0) {
     const { w: w2, h } = _labelSizeQueue.shift();
     return { x: 0, y: 0, width: w2, height: h };
+  }
+  if (text5 && this.tagName === "text") {
+    const attr = this.getAttribute && this.getAttribute("font-size");
+    const fontSize = attr ? parseFloat(attr) : 14;
+    const w2 = measureText(text5, fontSize);
+    return { x: 0, y: 0, width: Math.max(w2, 10), height: Math.ceil(fontSize * 1.4) };
   }
   return { x: 0, y: 0, width: 10, height: 10 };
 };
@@ -355417,6 +355426,60 @@ function fixOverlaps(skeletonElements) {
   }
   return skeletonElements;
 }
+function fixSequenceDiagram(elements3) {
+  const topBoxes = elements3.filter((e) => e.id && /^[^?].*-top$/.test(e.id) && e.type !== "text");
+  if (topBoxes.length === 0) return null;
+  const lifelines = elements3.filter((e) => e.type === "line");
+  if (lifelines.length === 0) return null;
+  const ACTOR_H = 40;
+  const ACTOR_PAD_X = 14;
+  const ACTOR_FONT_SIZE = 14;
+  const TOP_Y = 10;
+  topBoxes.sort((a, b) => a.x - b.x);
+  lifelines.sort((a, b) => a.x - b.x);
+  const arrowYs = elements3.filter((e) => e.type === "arrow").map((e) => e.y);
+  const lastArrowY = arrowYs.length > 0 ? Math.max(...arrowYs) : 200;
+  const BOT_Y = lastArrowY + 60;
+  const byId = new Map(elements3.map((e) => [e.id, e]));
+  for (let i = 0; i < topBoxes.length && i < lifelines.length; i++) {
+    const topBox = topBoxes[i];
+    const name = topBox.id.replace(/-top$/, "");
+    const topLabel = byId.get(topBox.id + "_label");
+    const botBox = byId.get(name + "-bottom");
+    const botLabel = byId.get(name + "-bottom_label");
+    const lifeline = lifelines[i];
+    const labelText = topLabel ? topLabel.text || name : name;
+    const boxW = Math.max(measureText(labelText, ACTOR_FONT_SIZE) + ACTOR_PAD_X * 2, 80);
+    const lx = lifeline.x;
+    const bx = lx - boxW / 2;
+    topBox.x = bx;
+    topBox.y = TOP_Y;
+    topBox.width = boxW;
+    topBox.height = ACTOR_H;
+    if (topLabel) {
+      topLabel.x = bx;
+      topLabel.y = TOP_Y + (ACTOR_H - ACTOR_FONT_SIZE) / 2;
+      topLabel.width = boxW;
+      topLabel.height = ACTOR_FONT_SIZE + 4;
+    }
+    if (botBox) {
+      botBox.x = bx;
+      botBox.y = BOT_Y;
+      botBox.width = boxW;
+      botBox.height = ACTOR_H;
+    }
+    if (botLabel) {
+      botLabel.x = bx;
+      botLabel.y = BOT_Y + (ACTOR_H - ACTOR_FONT_SIZE) / 2;
+      botLabel.width = boxW;
+      botLabel.height = ACTOR_FONT_SIZE + 4;
+    }
+    lifeline.y = TOP_Y + ACTOR_H;
+    lifeline.height = BOT_Y - TOP_Y - ACTOR_H;
+    lifeline.strokeStyle = "dashed";
+  }
+  return elements3;
+}
 function convertElements(skeletonElements) {
   const result = [];
   for (const el of skeletonElements) {
@@ -355437,6 +355500,20 @@ function convertElements(skeletonElements) {
       if (start3) arrow.startBinding = { elementId: start3.id, focus: 0, gap: 8 };
       if (end2) arrow.endBinding = { elementId: end2.id, focus: 0, gap: 8 };
       result.push(arrow);
+    } else if (el.type === "line") {
+      const dx = el.width || 0;
+      const dy = el.height || 0;
+      result.push({
+        ...BASE_PROPS,
+        seed: seed(),
+        roundness: null,
+        lastCommittedPoint: null,
+        startArrowhead: null,
+        endArrowhead: null,
+        ...rest,
+        points: [[0, 0], [dx, dy]],
+        boundElements: null
+      });
     } else {
       result.push({
         ...BASE_PROPS,
@@ -355482,7 +355559,8 @@ function convertElements(skeletonElements) {
     process.exit(1);
   }
   const { elements: skeletonElements, files } = await parseMermaidToExcalidraw2(mermaidSource);
-  const fixed = fixOverlaps(skeletonElements);
+  const seqFixed = fixSequenceDiagram(skeletonElements);
+  const fixed = seqFixed !== null ? seqFixed : fixOverlaps(skeletonElements);
   const elements3 = convertElements(fixed);
   const output2 = {
     type: "excalidraw",
