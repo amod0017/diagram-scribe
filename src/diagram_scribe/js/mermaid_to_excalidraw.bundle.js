@@ -310272,8 +310272,8 @@ var init_cytoscape_esm = __esm({
     K2 = 65599;
     DEFAULT_HASH_SEED_ALT = 5381;
     hashIterableInts = function hashIterableInts2(iterator) {
-      var seed = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : DEFAULT_HASH_SEED;
-      var hash = seed;
+      var seed2 = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : DEFAULT_HASH_SEED;
+      var hash = seed2;
       var entry;
       for (; ; ) {
         entry = iterator.next();
@@ -310285,12 +310285,12 @@ var init_cytoscape_esm = __esm({
       return hash;
     };
     hashInt = function hashInt2(num) {
-      var seed = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : DEFAULT_HASH_SEED;
-      return seed * K2 + num | 0;
+      var seed2 = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : DEFAULT_HASH_SEED;
+      return seed2 * K2 + num | 0;
     };
     hashIntAlt = function hashIntAlt2(num) {
-      var seed = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : DEFAULT_HASH_SEED_ALT;
-      return (seed << 5) + seed + num | 0;
+      var seed2 = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : DEFAULT_HASH_SEED_ALT;
+      return (seed2 << 5) + seed2 + num | 0;
     };
     combineHashes = function combineHashes2(hash1, hash2) {
       return hash1 * 2097152 + hash2;
@@ -310301,7 +310301,7 @@ var init_cytoscape_esm = __esm({
     hashArrays = function hashArrays2(hashes1, hashes2) {
       return [hashInt(hashes1[0], hashes2[0]), hashIntAlt(hashes1[1], hashes2[1])];
     };
-    hashIntsArray = function hashIntsArray2(ints, seed) {
+    hashIntsArray = function hashIntsArray2(ints, seed2) {
       var entry = {
         value: 0,
         done: false
@@ -310318,9 +310318,9 @@ var init_cytoscape_esm = __esm({
           return entry;
         }
       };
-      return hashIterableInts(iterator, seed);
+      return hashIterableInts(iterator, seed2);
     };
-    hashString = function hashString2(str2, seed) {
+    hashString = function hashString2(str2, seed2) {
       var entry = {
         value: 0,
         done: false
@@ -310337,7 +310337,7 @@ var init_cytoscape_esm = __esm({
           return entry;
         }
       };
-      return hashIterableInts(iterator, seed);
+      return hashIterableInts(iterator, seed2);
     };
     hashStrings = function hashStrings2() {
       return hashStringsArray(arguments);
@@ -321299,8 +321299,8 @@ var init_cytoscape_esm = __esm({
       }
       return rstyle;
     };
-    styfn$5.getNonDefaultPropertiesHash = function(ele, propNames, seed) {
-      var hash = seed.slice();
+    styfn$5.getNonDefaultPropertiesHash = function(ele, propNames, seed2) {
+      var hash = seed2.slice();
       var name, val, strVal, chVal;
       var i, j;
       for (i = 0; i < propNames.length; i++) {
@@ -352388,9 +352388,9 @@ var init_mermaid_f47111a7 = __esm({
       (text5, config22) => `${text5}${config22.fontSize}${config22.fontWeight}${config22.fontFamily}`
     );
     InitIDGenerator = class {
-      constructor(deterministic = false, seed) {
+      constructor(deterministic = false, seed2) {
         this.count = 0;
-        this.count = seed ? seed.length : 0;
+        this.count = seed2 ? seed2.length : 0;
         this.next = deterministic ? () => this.count++ : () => Date.now();
       }
     };
@@ -355228,6 +355228,79 @@ global.window = dom.window;
 global.document = dom.window.document;
 Object.defineProperty(global, "navigator", { value: dom.window.navigator, writable: true });
 dom.window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 100, height: 30 });
+var BASE_PROPS = {
+  angle: 0,
+  strokeColor: "#1e1e1e",
+  backgroundColor: "transparent",
+  fillStyle: "solid",
+  strokeStyle: "solid",
+  roughness: 1,
+  opacity: 100,
+  frameId: null,
+  version: 1,
+  versionNonce: 0,
+  isDeleted: false,
+  boundElements: null,
+  updated: Date.now(),
+  link: null,
+  locked: false
+};
+function seed() {
+  return Math.floor(Math.random() * 99999) + 1;
+}
+function convertElements(skeletonElements) {
+  const result = [];
+  for (const el of skeletonElements) {
+    const { label, start: start3, end: end2, ...rest } = el;
+    const hasLabel = label && label.text;
+    const textId = `${el.id}_label`;
+    if (el.type === "arrow") {
+      const arrow = {
+        ...BASE_PROPS,
+        seed: seed(),
+        roundness: el.roundness || { type: 2 },
+        lastCommittedPoint: null,
+        startArrowhead: null,
+        endArrowhead: "arrow",
+        ...rest,
+        boundElements: hasLabel ? [{ type: "text", id: textId }] : null
+      };
+      if (start3) arrow.startBinding = { elementId: start3.id, focus: 0, gap: 8 };
+      if (end2) arrow.endBinding = { elementId: end2.id, focus: 0, gap: 8 };
+      result.push(arrow);
+    } else {
+      result.push({
+        ...BASE_PROPS,
+        seed: seed(),
+        roundness: el.type === "rectangle" ? { type: 3 } : null,
+        ...rest,
+        boundElements: hasLabel ? [{ type: "text", id: textId }] : null
+      });
+    }
+    if (hasLabel) {
+      const fontSize = label.fontSize || 20;
+      result.push({
+        ...BASE_PROPS,
+        seed: seed(),
+        id: textId,
+        type: "text",
+        x: el.x,
+        y: el.y + ((el.height || 0) - fontSize) / 2,
+        width: el.width || 100,
+        height: fontSize + 4,
+        text: label.text,
+        fontSize,
+        fontFamily: 1,
+        textAlign: "center",
+        verticalAlign: "middle",
+        containerId: el.id,
+        baseline: fontSize - 4,
+        groupIds: label.groupIds || []
+      });
+    }
+  }
+  return result;
+}
 (async function main2() {
   const { parseMermaidToExcalidraw: parseMermaidToExcalidraw2 } = await Promise.resolve().then(() => (init_dist2(), dist_exports2));
   const chunks = [];
@@ -355239,7 +355312,8 @@ dom.window.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 100, heigh
     process.stderr.write("No Mermaid source provided on stdin\n");
     process.exit(1);
   }
-  const { elements: elements3, files } = await parseMermaidToExcalidraw2(mermaidSource);
+  const { elements: skeletonElements, files } = await parseMermaidToExcalidraw2(mermaidSource);
+  const elements3 = convertElements(skeletonElements);
   const output2 = {
     type: "excalidraw",
     version: 2,
