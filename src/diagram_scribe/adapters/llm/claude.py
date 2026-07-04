@@ -1,6 +1,5 @@
 from __future__ import annotations
 import os
-import anthropic
 from ...models import DiagramIR, MermaidIR
 from ...prompts import (
     SYSTEM_PROMPT, build_generate_messages, build_refine_messages,
@@ -32,6 +31,7 @@ class ClaudeAdapter:
         api_key: str | None = None,
         model: str | None = None,
     ):
+        import anthropic
         self._client = anthropic.Anthropic(api_key=api_key)
         self._model = model or os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 

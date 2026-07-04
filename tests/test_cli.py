@@ -23,10 +23,11 @@ def test_build_llm_uses_ollama_when_model_set():
 
 
 def test_build_llm_uses_claude_when_anthropic_key_set():
+    pytest.importorskip("anthropic")
     env = {"ANTHROPIC_API_KEY": "test-key"}
     with patch.dict(os.environ, env, clear=False), \
          patch.dict(os.environ, {"OPENROUTER_API_KEY": "", "OLLAMA_MODEL": ""}, clear=False):
-        with patch("diagram_scribe.adapters.llm.claude.anthropic.Anthropic"):
+        with patch("anthropic.Anthropic"):
             llm = _build_llm()
         assert "Claude" in type(llm).__name__
 
@@ -219,6 +220,7 @@ def test_model_flag_used_for_ollama(monkeypatch):
 
 
 def test_model_flag_used_for_anthropic(monkeypatch):
+    pytest.importorskip("anthropic")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("OLLAMA_MODEL", raising=False)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
