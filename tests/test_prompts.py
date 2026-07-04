@@ -129,6 +129,28 @@ def test_parse_response_raises_on_empty_mermaid_body():
         parse_response("FORMAT: mermaid\n")
 
 
+def test_parse_response_strips_mermaid_code_fences():
+    text = "FORMAT: mermaid\n```mermaid\nflowchart TD\n  A --> B\n```"
+    result = parse_response(text)
+    assert isinstance(result, MermaidIR)
+    assert result.source.startswith("flowchart")
+    assert "```" not in result.source
+
+
+def test_parse_response_strips_plain_code_fences():
+    text = "FORMAT: mermaid\n```\nsequenceDiagram\n  A->>B: hi\n```"
+    result = parse_response(text)
+    assert isinstance(result, MermaidIR)
+    assert result.source.startswith("sequenceDiagram")
+    assert "```" not in result.source
+
+
+def test_parse_response_leaves_unfenced_mermaid_unchanged():
+    text = "FORMAT: mermaid\nflowchart TD\n  A --> B"
+    result = parse_response(text)
+    assert result.source == "flowchart TD\n  A --> B"
+
+
 def test_build_mermaid_refine_messages_raises_on_empty_source():
     import pytest
     with pytest.raises(ValueError, match="empty source"):

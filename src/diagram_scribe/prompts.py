@@ -169,6 +169,8 @@ def parse_response(text: str) -> DiagramIR | MermaidIR:
         source = rest.strip()
         if not source:
             raise ValueError("LLM returned FORMAT: mermaid with no diagram content")
+        # Strip optional code fences the LLM may wrap around the diagram.
+        source = re.sub(r"^```[a-z]*\n?", "", source).rstrip("`").strip()
         first_word = source.split()[0]
         return MermaidIR(source=source, diagram_type=first_word)
 
