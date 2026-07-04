@@ -1,8 +1,11 @@
 from __future__ import annotations
 import os
 import anthropic
-from ...models import DiagramIR
-from ...prompts import SYSTEM_PROMPT, build_generate_messages, build_refine_messages, parse_ir_response
+from ...models import DiagramIR, MermaidIR
+from ...prompts import (
+    SYSTEM_PROMPT, build_generate_messages, build_refine_messages,
+    build_mermaid_refine_messages, parse_response,
+)
 
 
 class ClaudeAdapter:
@@ -41,8 +44,10 @@ class ClaudeAdapter:
         )
         return response.content[0].text
 
-    def generate(self, description: str) -> DiagramIR:
-        return parse_ir_response(self._call(build_generate_messages(description)))
+    def generate(self, description: str) -> DiagramIR | MermaidIR:
+        return parse_response(self._call(build_generate_messages(description)))
 
-    def refine(self, feedback: str, current: DiagramIR) -> DiagramIR:
-        return parse_ir_response(self._call(build_refine_messages(feedback, current)))
+    def refine(self, feedback: str, current: DiagramIR | MermaidIR) -> DiagramIR | MermaidIR:
+        if isinstance(current, MermaidIR):
+            return parse_response(self._call(build_mermaid_refine_messages(feedback, current)))
+        return parse_response(self._call(build_refine_messages(feedback, current)))

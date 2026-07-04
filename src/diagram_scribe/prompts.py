@@ -1,27 +1,57 @@
 """Prompt construction and response parsing for LLM adapters.
 
-All LLM adapters share the same prompts and the same JSON schema. This
-module keeps that logic in one place so changing the prompt affects every
-adapter at once.
+All LLM adapters share the same system prompt and response parser. The LLM
+chooses between two output formats based on the diagram type:
 
-The LLM is always asked to return a JSON object with this shape::
+**FORMAT: mermaid** — for flowcharts, sequence diagrams, ER diagrams, class
+diagrams. The LLM outputs valid Mermaid code after the header line.
+
+**FORMAT: graph** — for architecture diagrams, mindmaps, and simple spatial
+layouts. The LLM outputs a JSON object::
 
     {
       "nodes": [{"id": "...", "label": "...", "shape": "..."}],
       "edges": [{"from_id": "...", "to_id": "...", "label": "..."}]
     }
 
-``shape`` must be one of "box", "diamond", "circle", "cylinder".
-``label`` on edges is optional.
+``parse_response()`` reads the FORMAT header and returns either a
+``DiagramIR`` (graph path) or a ``MermaidIR`` (mermaid path).
 """
 from __future__ import annotations
 import dataclasses
 import json
 import re
-from .models import DiagramIR, Node, Edge
+from .models import DiagramIR, MermaidIR, Node, Edge
 
 SYSTEM_PROMPT = """\
-You are a diagram generator. Given a description, return a JSON object.
+You are a diagram generator. Given a description, choose the best output format and generate the diagram.
+
+IMPORTANT: The FIRST line of your response MUST be one of:
+  FORMAT: mermaid
+  FORMAT: graph
+
+Choose FORMAT based on the diagram type:
+- flowchart, sequence diagram, ER diagram, class diagram → FORMAT: mermaid
+- architecture diagram, mindmap, simple spatial layout (3-6 nodes) → FORMAT: graph
+- If the description specifies a type (e.g. "[sequence diagram]"), follow it
+
+---
+If FORMAT: mermaid, output valid Mermaid code after the FORMAT line.
+
+Mermaid diagram types:
+- flowchart TD  — top-down flowchart (decisions, processes, workflows)
+- sequenceDiagram — interactions between actors over time
+- erDiagram — entity-relationship diagrams
+- classDiagram — class/type hierarchies
+- graph LR — left-to-right simple flow
+
+Mermaid rules:
+- Keep node labels short (4-6 words max)
+- Use |label| on edges for decision branches (yes/no, success/failure)
+- Do NOT wrap in markdown code fences
+
+---
+If FORMAT: graph, output a JSON object after the FORMAT line.
 
 Schema:
 {
@@ -44,10 +74,13 @@ Diagram type guide — follow these conventions when a type is specified or impl
 - Mind map: circle (central topic), box (branches and sub-topics)
 - Class diagram: box (classes), label edges with relationship type (extends, implements, uses)
 
-Rules:
-- Use short snake_case ids (e.g. "validate_token", "deploy_staging")
-- Label edges on decisions (e.g. "yes", "no", "success", "failure")
-- Return ONLY valid JSON. No markdown, no explanation.
+Graph rules:
+- Use short snake_case ids (e.g. "api_gateway", "user_db")
+- Keep labels concise (4-6 words max)
+- Return ONLY valid JSON — no markdown, no explanation
+
+---
+Return ONLY the FORMAT line followed by the diagram. No preamble, no explanation.
 """
 
 
@@ -85,7 +118,7 @@ def build_refine_messages(feedback: str, current: DiagramIR) -> list[dict]:
             "content": (
                 f"Current diagram:\n{current_json}\n\n"
                 f"Feedback: {feedback}\n\n"
-                "Return the updated diagram as JSON."
+                "Return FORMAT: graph followed by the updated diagram as JSON."
             ),
         }
     ]
@@ -118,3 +151,67 @@ def parse_ir_response(text: str) -> DiagramIR:
         for e in data.get("edges", [])
     ]
     return DiagramIR(nodes=nodes, edges=edges)
+
+
+def parse_response(text: str) -> DiagramIR | MermaidIR:
+    """Parse an LLM response that begins with a FORMAT header.
+
+    Strips think tags, reads the first line to determine format, then
+    dispatches to ``parse_ir_response`` for graph responses or constructs
+    a ``MermaidIR`` for mermaid responses. Falls back to ``parse_ir_response``
+    when no FORMAT header is present (backward compatibility).
+
+    Args:
+        text: Raw LLM response text.
+
+    Returns:
+        A ``MermaidIR`` or ``DiagramIR`` depending on the FORMAT header.
+    """
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+
+    lines = text.split("\n", 1)
+    first_line = lines[0].strip()
+    rest = lines[1].strip() if len(lines) > 1 else ""
+
+    if first_line == "FORMAT: mermaid":
+        source = rest.strip()
+        if not source:
+            raise ValueError("LLM returned FORMAT: mermaid with no diagram content")
+        # Strip optional code fences the LLM may wrap around the diagram.
+        source = re.sub(r"^```[a-z]*\n?", "", source).rstrip("`").strip()
+        first_word = source.split()[0]
+        return MermaidIR(source=source, diagram_type=first_word)
+
+    if first_line == "FORMAT: graph":
+        return parse_ir_response(rest)
+
+    # No FORMAT header — treat entire text as DiagramIR JSON (backward compat)
+    return parse_ir_response(text)
+
+
+def build_mermaid_refine_messages(feedback: str, current: MermaidIR) -> list[dict]:
+    """Build the messages list for a refine() call on a Mermaid diagram.
+
+    Includes the current Mermaid source so the LLM can produce an updated
+    version incorporating the feedback.
+
+    Args:
+        feedback: Plain English instruction for what to change.
+        current: The current Mermaid diagram state.
+
+    Returns:
+        A list of message dicts in the chat API format.
+    """
+    if not current.source:
+        raise ValueError("Cannot refine a MermaidIR with empty source")
+    return [
+        {
+            "role": "user",
+            "content": (
+                f"Current diagram (Mermaid):\n{current.source}\n\n"
+                f"Feedback: {feedback}\n\n"
+                "Return the updated diagram. "
+                "Remember: first line must be FORMAT: mermaid, then the Mermaid code."
+            ),
+        }
+    ]

@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 from diagram_scribe.adapters.llm.claude import ClaudeAdapter
-from diagram_scribe.models import DiagramIR, Node
+from diagram_scribe.models import DiagramIR, MermaidIR, Node
 
 _VALID_JSON = '{"nodes": [{"id": "a", "label": "Start", "shape": "circle"}], "edges": []}'
 
@@ -49,3 +49,13 @@ def test_refine_passes_current_ir_in_message():
         message_content = str(call_kwargs["messages"])
         assert "add a step" in message_content
         assert '"id": "a"' in message_content
+
+
+def test_generate_returns_mermaid_ir_when_format_mermaid():
+    mock_response = MagicMock()
+    mock_response.content[0].text = "FORMAT: mermaid\nflowchart TD\n  A --> B"
+    with patch("diagram_scribe.adapters.llm.claude.anthropic.Anthropic") as mock_anthropic:
+        mock_anthropic.return_value.messages.create.return_value = mock_response
+        adapter = ClaudeAdapter(api_key="test")
+        result = adapter.generate("login flow")
+    assert isinstance(result, MermaidIR)

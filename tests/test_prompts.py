@@ -1,8 +1,10 @@
-from diagram_scribe.models import Node, Edge, DiagramIR
+from diagram_scribe.models import Node, Edge, DiagramIR, MermaidIR
 from diagram_scribe.prompts import (
     build_generate_messages,
     build_refine_messages,
     parse_ir_response,
+    parse_response,
+    build_mermaid_refine_messages,
 )
 
 
@@ -75,3 +77,81 @@ def test_parse_ir_response_strips_multiline_think_tags():
     )
     ir = parse_ir_response(text)
     assert ir.nodes[0].id == "b"
+
+
+def test_parse_response_returns_mermaid_ir_on_mermaid_format():
+    text = "FORMAT: mermaid\nflowchart TD\n  A --> B"
+    result = parse_response(text)
+    assert isinstance(result, MermaidIR)
+    assert "flowchart TD" in result.source
+    assert "FORMAT: mermaid" not in result.source
+
+
+def test_parse_response_returns_diagram_ir_on_graph_format():
+    text = '{"nodes": [{"id": "a", "label": "A", "shape": "box"}], "edges": []}'
+    text_with_header = 'FORMAT: graph\n' + text
+    result = parse_response(text_with_header)
+    assert isinstance(result, DiagramIR)
+    assert result.nodes[0].id == "a"
+
+
+def test_parse_response_falls_back_to_diagram_ir_when_no_header():
+    text = '{"nodes": [{"id": "a", "label": "A", "shape": "box"}], "edges": []}'
+    result = parse_response(text)
+    assert isinstance(result, DiagramIR)
+
+
+def test_parse_response_strips_think_tags_before_format_header():
+    text = "<think>reasoning</think>\nFORMAT: mermaid\nflowchart TD\n  A --> B"
+    result = parse_response(text)
+    assert isinstance(result, MermaidIR)
+
+
+def test_parse_response_detects_diagram_type_from_mermaid_source():
+    text = "FORMAT: mermaid\nsequenceDiagram\n  A->>B: hello"
+    result = parse_response(text)
+    assert isinstance(result, MermaidIR)
+    assert result.diagram_type == "sequenceDiagram"
+
+
+def test_build_mermaid_refine_messages_includes_source_and_feedback():
+    ir = MermaidIR(source="flowchart TD\n  A --> B", diagram_type="flowchart")
+    messages = build_mermaid_refine_messages("add a C node", ir)
+    assert len(messages) == 1
+    assert "flowchart TD" in messages[0]["content"]
+    assert "add a C node" in messages[0]["content"]
+    assert "FORMAT: mermaid" in messages[0]["content"]
+
+
+def test_parse_response_raises_on_empty_mermaid_body():
+    import pytest
+    with pytest.raises(ValueError, match="no diagram content"):
+        parse_response("FORMAT: mermaid\n")
+
+
+def test_parse_response_strips_mermaid_code_fences():
+    text = "FORMAT: mermaid\n```mermaid\nflowchart TD\n  A --> B\n```"
+    result = parse_response(text)
+    assert isinstance(result, MermaidIR)
+    assert result.source.startswith("flowchart")
+    assert "```" not in result.source
+
+
+def test_parse_response_strips_plain_code_fences():
+    text = "FORMAT: mermaid\n```\nsequenceDiagram\n  A->>B: hi\n```"
+    result = parse_response(text)
+    assert isinstance(result, MermaidIR)
+    assert result.source.startswith("sequenceDiagram")
+    assert "```" not in result.source
+
+
+def test_parse_response_leaves_unfenced_mermaid_unchanged():
+    text = "FORMAT: mermaid\nflowchart TD\n  A --> B"
+    result = parse_response(text)
+    assert result.source == "flowchart TD\n  A --> B"
+
+
+def test_build_mermaid_refine_messages_raises_on_empty_source():
+    import pytest
+    with pytest.raises(ValueError, match="empty source"):
+        build_mermaid_refine_messages("add C", MermaidIR(source=""))

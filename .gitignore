@@ -19,3 +19,4 @@ _site/
 # IDE
 .vscode/
 .idea/
+js/node_modules/
