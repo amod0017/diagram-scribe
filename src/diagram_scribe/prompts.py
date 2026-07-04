@@ -60,11 +60,19 @@ Schema:
 }
 
 Shape guide:
-- "box": services, components, steps, classes, entities
-- "diamond": decisions, conditions
-- "circle": start/end points, actors
-- "cylinder": databases, queues, storage
-- "text": floating annotations (no border)
+- "box": process steps, actions, tasks, services, components, classes, entities
+- "diamond": decisions, conditions, branches, gateways
+- "circle": start/end points, events, actors, users
+- "cylinder": databases, storage systems, queues, caches
+- "text": floating annotations or notes (no border; avoid connecting edges to these)
+
+Diagram type guide — follow these conventions when a type is specified or implied:
+- Flowchart: circle (start/end), box (steps), diamond (decisions), label decision edges "yes"/"no"
+- Sequence diagram: circle (actors/systems), box (messages as ordered steps), label edges with the action name
+- ER diagram: box (entities), cylinder (tables/stores), diamond (relationships), label edges with cardinality
+- Architecture diagram: box (services), cylinder (databases), label edges with protocols or data types
+- Mind map: circle (central topic), box (branches and sub-topics)
+- Class diagram: box (classes), label edges with relationship type (extends, implements, uses)
 
 Graph rules:
 - Use short snake_case ids (e.g. "api_gateway", "user_db")
