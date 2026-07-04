@@ -59,13 +59,7 @@ Go to [openrouter.ai](https://openrouter.ai) and sign up. No credit card needed 
 2. Click **Create key**, give it any name, click **Create**
 3. Copy the key — it starts with `sk-or-v1-...`
 
-**Step 3 — Install the extra dependency**
-
-```bash
-pip install "diagram-scribe[openrouter]"
-```
-
-**Step 4 — Set your key**
+**Step 3 — Set your key**
 
 Create a file called `.env` in the folder where you run `diagram-scribe`:
 
@@ -121,13 +115,7 @@ ollama pull qwen2.5
 
 This downloads the model (about 4 GB). You only do this once.
 
-**Step 3 — Install the extra dependency**
-
-```bash
-pip install "diagram-scribe[ollama]"
-```
-
-**Step 4 — Tell DiagramScribe which model to use**
+**Step 3 — Tell DiagramScribe which model to use**
 
 Create a `.env` file in the folder where you run `diagram-scribe`:
 
@@ -233,7 +221,7 @@ The diagram opens as an `.excalidraw` file in your browser on the first call. Su
 ```python
 from diagram_scribe import DiagramScribe
 
-ds = DiagramScribe()  # uses Claude by default (ANTHROPIC_API_KEY must be set)
+ds = DiagramScribe()  # uses OpenRouter by default (OPENROUTER_API_KEY must be set)
 ds.draw(
     "User authentication flow — user submits credentials, validate token, "
     "if valid return dashboard, if invalid increment retry count, "
@@ -288,7 +276,7 @@ ds.draw("Git branching strategy — main branch, feature branches, "
 
 ### Saving to a custom file path
 
-By default the diagram is saved to `~/.diagram-scribe/current.excalidraw`. To save elsewhere:
+By default the diagram is saved to `~/Documents/diagram-scribe.excalidraw`. To save elsewhere:
 
 ```python
 from diagram_scribe import DiagramScribe
