@@ -5,14 +5,32 @@ build-backend = "hatchling.build"
 [project]
 name = "diagram-scribe"
 version = "0.1.0"
-description = "Turn natural language descriptions into diagrams"
+description = "Turn natural language descriptions into Excalidraw diagrams"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
+authors = [
+    {name = "Amod", email = "amod0017@gmail.com"},
+]
+keywords = ["diagram", "excalidraw", "llm", "ai", "mermaid", "flowchart"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "openai>=1.0.0",
     "python-dotenv>=1.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/amod0017/diagram-scribe"
+Repository = "https://github.com/amod0017/diagram-scribe"
+Issues = "https://github.com/amod0017/diagram-scribe/issues"
 
 [project.optional-dependencies]
 claude = ["anthropic>=0.40.0"]
