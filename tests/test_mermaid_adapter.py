@@ -21,53 +21,39 @@ def _fake_excalidraw_json():
     })
 
 
+def _mock_node_run(stdout=None):
+    r = MagicMock()
+    r.returncode = 0
+    r.stdout = stdout or _fake_excalidraw_json()
+    r.stderr = ""
+    return r
+
+
 def test_mermaid_adapter_calls_node_subprocess(tmp_path):
     output = tmp_path / "out.excalidraw"
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = _fake_excalidraw_json()
-    mock_result.stderr = ""
-
-    with patch("diagram_scribe.adapters.backend.mermaid.subprocess.run", return_value=mock_result) as mock_run, \
-         patch("diagram_scribe.adapters.backend.mermaid.webbrowser.open"):
+    with patch("diagram_scribe.adapters.backend.mermaid.subprocess.run",
+               return_value=_mock_node_run()) as mock_run:
         MermaidAdapter(output_path=str(output)).render(_simple_mermaid_ir())
-
     mock_run.assert_called_once()
-    call_args = mock_run.call_args
-    assert "node" in call_args[0][0]
-    assert call_args[1]["input"] == "flowchart TD\n  A[Start] --> B[End]"
+    assert "node" in mock_run.call_args[0][0]
+    assert mock_run.call_args[1]["input"] == "flowchart TD\n  A[Start] --> B[End]"
 
 
 def test_mermaid_adapter_writes_excalidraw_file(tmp_path):
     output = tmp_path / "out.excalidraw"
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = _fake_excalidraw_json()
-    mock_result.stderr = ""
-
-    with patch("diagram_scribe.adapters.backend.mermaid.subprocess.run", return_value=mock_result), \
-         patch("diagram_scribe.adapters.backend.mermaid.webbrowser.open"):
+    with patch("diagram_scribe.adapters.backend.mermaid.subprocess.run",
+               return_value=_mock_node_run()):
         MermaidAdapter(output_path=str(output)).render(_simple_mermaid_ir())
-
     assert output.exists()
-    data = json.loads(output.read_text())
-    assert data["type"] == "excalidraw"
+    assert json.loads(output.read_text())["type"] == "excalidraw"
 
 
-def test_mermaid_adapter_opens_browser_on_first_render(tmp_path):
+def test_mermaid_adapter_prints_saved_path(tmp_path, capsys):
     output = tmp_path / "out.excalidraw"
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = _fake_excalidraw_json()
-    mock_result.stderr = ""
-
-    with patch("diagram_scribe.adapters.backend.mermaid.subprocess.run", return_value=mock_result), \
-         patch("diagram_scribe.adapters.backend.mermaid.webbrowser.open") as mock_browser:
-        adapter = MermaidAdapter(output_path=str(output))
-        adapter.render(_simple_mermaid_ir())
-        mock_browser.assert_called_once()
-        adapter.render(_simple_mermaid_ir())
-        assert mock_browser.call_count == 1
+    with patch("diagram_scribe.adapters.backend.mermaid.subprocess.run",
+               return_value=_mock_node_run()):
+        MermaidAdapter(output_path=str(output)).render(_simple_mermaid_ir())
+    assert str(output) in capsys.readouterr().out
 
 
 def test_mermaid_adapter_raises_when_node_missing(tmp_path):

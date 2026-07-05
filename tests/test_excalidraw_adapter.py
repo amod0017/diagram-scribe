@@ -180,33 +180,26 @@ def test_layout_child_nodes_below_parent():
 
 # --- render ---
 
-def test_render_opens_browser_on_first_call():
+def test_render_writes_file(tmp_path):
     ir = _simple_ir()
-    with patch("diagram_scribe.adapters.backend.excalidraw.webbrowser.open") as mock_browser, \
-         patch("builtins.open", mock_open()), \
-         patch("diagram_scribe.adapters.backend.excalidraw.os.makedirs"):
-        ExcalidrawAdapter().render(ir)
-        mock_browser.assert_called_once()
+    out = tmp_path / "diagram.excalidraw"
+    ExcalidrawAdapter(output_path=str(out)).render(ir)
+    assert out.exists()
+    assert json.loads(out.read_text())["type"] == "excalidraw"
 
 
-def test_render_does_not_open_browser_on_subsequent_calls():
+def test_render_prints_saved_path(tmp_path, capsys):
     ir = _simple_ir()
-    with patch("diagram_scribe.adapters.backend.excalidraw.webbrowser.open") as mock_browser, \
-         patch("builtins.open", mock_open()), \
-         patch("diagram_scribe.adapters.backend.excalidraw.os.makedirs"):
-        adapter = ExcalidrawAdapter()
-        adapter.render(ir)
-        adapter.render(ir)
-        assert mock_browser.call_count == 1
+    out = tmp_path / "diagram.excalidraw"
+    ExcalidrawAdapter(output_path=str(out)).render(ir)
+    assert str(out) in capsys.readouterr().out
 
 
-def test_render_uses_output_path_when_provided():
+def test_render_uses_output_path_when_provided(tmp_path):
     ir = _simple_ir()
-    with patch("diagram_scribe.adapters.backend.excalidraw.webbrowser.open"), \
-         patch("builtins.open", mock_open()) as mock_file, \
-         patch("diagram_scribe.adapters.backend.excalidraw.os.makedirs"):
-        ExcalidrawAdapter(output_path="/custom/path.excalidraw").render(ir)
-        mock_file.assert_called_with("/custom/path.excalidraw", "w", encoding="utf-8")
+    out = tmp_path / "custom.excalidraw"
+    ExcalidrawAdapter(output_path=str(out)).render(ir)
+    assert out.exists()
 
 
 # --- cylinder shape (#63) ---

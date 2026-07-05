@@ -1,4 +1,7 @@
+import pytest
 from unittest.mock import MagicMock, patch
+
+pytest.importorskip("anthropic")
 from diagram_scribe.adapters.llm.claude import ClaudeAdapter
 from diagram_scribe.models import DiagramIR, MermaidIR, Node
 
@@ -6,7 +9,7 @@ _VALID_JSON = '{"nodes": [{"id": "a", "label": "Start", "shape": "circle"}], "ed
 
 
 def test_generate_returns_diagram_ir():
-    with patch("diagram_scribe.adapters.llm.claude.anthropic.Anthropic") as mock_cls:
+    with patch("anthropic.Anthropic") as mock_cls:
         mock_client = MagicMock()
         mock_cls.return_value = mock_client
         mock_client.messages.create.return_value.content = [MagicMock(text=_VALID_JSON)]
@@ -21,7 +24,7 @@ def test_generate_returns_diagram_ir():
 
 
 def test_generate_passes_system_prompt():
-    with patch("diagram_scribe.adapters.llm.claude.anthropic.Anthropic") as mock_cls:
+    with patch("anthropic.Anthropic") as mock_cls:
         mock_client = MagicMock()
         mock_cls.return_value = mock_client
         mock_client.messages.create.return_value.content = [MagicMock(text=_VALID_JSON)]
@@ -35,7 +38,7 @@ def test_generate_passes_system_prompt():
 
 
 def test_refine_passes_current_ir_in_message():
-    with patch("diagram_scribe.adapters.llm.claude.anthropic.Anthropic") as mock_cls:
+    with patch("anthropic.Anthropic") as mock_cls:
         mock_client = MagicMock()
         mock_cls.return_value = mock_client
         mock_client.messages.create.return_value.content = [MagicMock(text=_VALID_JSON)]
@@ -54,7 +57,7 @@ def test_refine_passes_current_ir_in_message():
 def test_generate_returns_mermaid_ir_when_format_mermaid():
     mock_response = MagicMock()
     mock_response.content[0].text = "FORMAT: mermaid\nflowchart TD\n  A --> B"
-    with patch("diagram_scribe.adapters.llm.claude.anthropic.Anthropic") as mock_anthropic:
+    with patch("anthropic.Anthropic") as mock_anthropic:
         mock_anthropic.return_value.messages.create.return_value = mock_response
         adapter = ClaudeAdapter(api_key="test")
         result = adapter.generate("login flow")

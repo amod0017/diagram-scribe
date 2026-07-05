@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import webbrowser
 from pathlib import Path
 from ...models import MermaidIR
 
@@ -31,7 +30,6 @@ class MermaidAdapter:
 
     def __init__(self, output_path: str | None = None):
         self._output_path = output_path or _DEFAULT_PATH
-        self._opened = False
 
     def render(self, ir: MermaidIR) -> None:
         try:
@@ -59,9 +57,4 @@ class MermaidAdapter:
         os.makedirs(os.path.dirname(self._output_path), exist_ok=True)
         with open(self._output_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
-
-        if not self._opened:
-            webbrowser.open(f"file://{os.path.abspath(self._output_path)}")
-            self._opened = True
-        else:
-            print("Diagram updated — refresh your browser tab to see changes.")
+        print(f"[diagram saved to {self._output_path}]")
