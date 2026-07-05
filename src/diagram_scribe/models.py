@@ -9,7 +9,8 @@ class Node:
     Attributes:
         id: Unique identifier used to reference this node in edges.
         label: Display text rendered inside the shape.
-        shape: Visual shape. One of "box", "diamond", "circle", "cylinder".
+        shape: Visual shape. One of ``"box"``, ``"diamond"``, ``"circle"``,
+            ``"cylinder"``, or ``"text"`` (floating label, no border).
     """
     id: str
     label: str
